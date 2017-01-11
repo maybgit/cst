@@ -1,0 +1,19 @@
+﻿<%@ CodeTemplate Language="C#" TargetLanguage="C#" Debug="False" Description="Create a list of properties from database table." Inherits="CodeSmith.BaseTemplates.OutputFileCodeTemplate" %>
+<%@ Assembly Name="CodeSmith.BaseTemplates" %>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer" %>
+<%@ Property Name="tbName" Type="String" Category="Output" %>
+<%
+	Response.WriteLine("using System;");
+	Response.WriteLine("using System.Collections.Generic;");
+	Response.WriteLine("using System.Linq;");
+	Response.WriteLine("using System.Text;");
+	Response.WriteLine("using System.Data;");
+	Response.WriteLine("namespace BLL.Views");
+	Response.WriteLine("{");
+	Response.WriteLine("    public class "+this.tbName+"BLL : BaseViews."+this.tbName);
+	Response.WriteLine("    {");
+	Response.WriteLine("    	public "+this.tbName+"BLL() { }");
+	Response.WriteLine("    }");
+	Response.WriteLine("}");
+%>

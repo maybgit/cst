@@ -1,0 +1,32 @@
+﻿<%@ CodeTemplate Language="C#" TargetLanguage="C#" Encoding="utf-8" Debug="False" Description="Create a list of properties from database table." Inherits="CodeSmith.BaseTemplates.OutputFileCodeTemplate"%>
+<%@ Assembly Name="CodeSmith.BaseTemplates" %>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer" %>
+<%@ Property Name="SourceDatabase" Type="SchemaExplorer.DatabaseSchema" %>
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Data;
+namespace BLL
+{
+	/*
+	 * Author:		mayb
+	 * Create date: <%=DateTime.Now %>
+	 * Description:	File Readonly
+	 */
+	 
+	 <% foreach(var item in SourceDatabase.Tables){
+	 	%>
+		public class <%=item.Name %> : DAL.Tables.<%=item.Name%>{
+			public string TableFields
+			{
+				get { return "<%=item.Columns.ToString().Replace(item.FullName+".","") %>";}
+			}
+		}
+		<%
+	 }%>
+	 
+	 
+
+}
