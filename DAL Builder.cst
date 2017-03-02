@@ -8,6 +8,7 @@
 <%@ Map Name="SqlCSharp" Src="Sql-CSharp" Description="System to C# Type Map" %>
 <%@ Map Name="DbDataReader" Src="DbType-DataReaderMethod" Description="DbType to DataReader Method Map" %>
 <%@ Map Name="SqlNativeSqlDb" Src="SqlNativeType-SqlDbType" Description="SqlNativeType to SqlDbType Map" %>
+<%@ Map Name="SqlNativeTypeToDbType" Src="SqlNativeType-DbType" %>
 <%@ Map Name="DbTypeCSharp" Src="DbType-CSharp" Description="DbType to CSharp Map" %>
 
 
@@ -35,6 +36,7 @@ namespace DAL
         public class Tables{       
             <%foreach (var item in SourceDatabase.Tables)
             {
+                if(item.Name!="TBL_Admins") continue;
                 string idName = null;
             %>
             public class <%=item.Name%>{
@@ -95,7 +97,7 @@ namespace DAL
                     bool isFirst = true;
                     foreach(var itemColumn in item.Columns){
                         %>
-                    sql.AddParameter("@<%=itemColumn.Name %>", SqlDbType.<%=GetSqlDbType(itemColumn) %>, <%=itemColumn.Name %>);
+                    sql.AddParameter("@<%=itemColumn.Name %>", SqlDbType.<%=GetSqlDbType(itemColumn) %>, <%=SqlNativeTypeToDbType[itemColumn.NativeType.ToString()]=="String"?"string.IsNullOrEmpty("+itemColumn.Name+")?(object)DBNull.Value:(object)"+itemColumn.Name+"":itemColumn.Name   %>);
                         <%
                        if (!(bool)itemColumn.ExtendedProperties["CS_isIdentity"].Value)
                        	{
@@ -112,7 +114,9 @@ namespace DAL
                 
                 
             }
-            <%}%>
+            <%
+            break;
+            }%>
         }
     
     
@@ -1161,10 +1165,10 @@ public string GetPrimaryKeyType(TableSchema table)
 	}
 }
 
-public override string GetFileName()
-{
-	return this.GetClassName(this.SourceTable) + ".cs";
-}
+//public override string GetFileName()
+//{
+//	return null;//return this.GetClassName(this.SourceTable) + ".cs";
+//}
 /*
 public class Views{
         <%foreach (var item in SourceDatabase.Views)
