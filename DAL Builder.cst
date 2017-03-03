@@ -27,34 +27,45 @@ using System.Xml;
 using System.Text;
 using System.Globalization;
 using System.Collections.Specialized;
+using System.Collections.Generic;
 
 namespace DAL
 {
     //[DebuggerStepThrough]
     public class SqlService
     {
+        public class Models{
+            <%foreach (var item in SourceDatabase.Tables)
+        	{
+             %>
+             public class <%=item.Name %>Model{
+                <%foreach (var itemColumn in item.Columns)
+                {%>
+                <%=itemColumn.SystemType.Name +" _"+itemColumn.Name+";" %>
+                public <%=itemColumn.SystemType.Name +" "+itemColumn.Name+"" %>{ get{ return _<%=itemColumn.Name%>; } set{ _<%=itemColumn.Name%> = value;}}
+                <%}%>
+             }
+             <%
+        	} %>
+        }
+    
         public class Tables{       
             <%foreach (var item in SourceDatabase.Tables)
             {
-                if(item.Name!="TBL_Admins") continue;
                 string idName = null;
             %>
             public class <%=item.Name%>{
                 public const string TableName = "<%=item.Name%>";
-                public <%=item.Name %>(){}
-                <%foreach (var itemColumn in item.Columns)
-                {
-                    if(itemColumn.Name.ToLower()=="id")idName = "_"+itemColumn.Name;
-                %>
-                <%=itemColumn.SystemType.Name +" _"+itemColumn.Name+";" %>
-                public <%=itemColumn.SystemType.Name +" "+itemColumn.Name+"" %>{ get{ return _<%=itemColumn.Name%>; } set{ _<%=itemColumn.Name%> = value;}}
-                <%}%>
-                
+                SqlService sql;
+                public SqlService Sql{ get { return sql??(sql = new SqlService()); } set { sql = value; } }
+                Models.<%=item.Name%>Model model;
+                public Models.<%=item.Name%>Model Model { get { return model ?? (model = new Models.<%=item.Name%>Model()); } set { model = value; } }
+                public List<Models.<%=item.Name%>Model> ListModel;
+                public <%=item.Name %>(){ }
                 public <%= item.Name %>(int id)
         		{
-        			SqlService sql = new SqlService();
-        			sql.AddParameter("@<%= item.PrimaryKey.MemberColumns[0].Name %>", SqlDbType.<%=GetSqlDbType(item.PrimaryKey.MemberColumns[0]) %>, id);
-        			SqlDataReader reader = sql.ExecuteSqlReader("SELECT * FROM dbo.<%= item.Name %> WHERE <%= item.PrimaryKey.MemberColumns[0].Name %> = @<%= item.PrimaryKey.MemberColumns[0].Name %>");
+        			Sql.AddParameter("@<%= item.PrimaryKey.MemberColumns[0].Name %>", SqlDbType.<%=GetSqlDbType(item.PrimaryKey.MemberColumns[0]) %>, id);
+        			SqlDataReader reader = Sql.ExecuteSqlReader("SELECT * FROM dbo.<%= item.Name %> WHERE <%= item.PrimaryKey.MemberColumns[0].Name %> = @<%= item.PrimaryKey.MemberColumns[0].Name %>");
         			
         			if (reader.Read()) 
         			{
@@ -82,7 +93,7 @@ namespace DAL
                         int index = item.Columns.IndexOf(itemColumn);
                         string dataType = DbDataReader[itemColumn.DataType.ToString()];
                         %>
-                        if(!reader.IsDBNull(<%=index%>)) _<%=itemColumn.Name %> = <%=dataType!="GetBytes"?"reader."+dataType+"("+index+")":"null" %>;
+                        if(!reader.IsDBNull(<%=index%>)) Model.<%=itemColumn.Name %> = <%=dataType!="GetBytes"?"reader."+dataType+"("+index+")":"null" %>;
                         <%
                     	} %>
         			}
@@ -90,14 +101,13 @@ namespace DAL
                 
                 public void Update()
         		{
-        			SqlService sql = new SqlService();
         			StringBuilder queryParameters = new StringBuilder();
                    <%
                     string id="";
                     bool isFirst = true;
                     foreach(var itemColumn in item.Columns){
                         %>
-                    sql.AddParameter("@<%=itemColumn.Name %>", SqlDbType.<%=GetSqlDbType(itemColumn) %>, <%=SqlNativeTypeToDbType[itemColumn.NativeType.ToString()]=="String"?"string.IsNullOrEmpty("+itemColumn.Name+")?(object)DBNull.Value:(object)"+itemColumn.Name+"":itemColumn.Name   %>);
+                    Sql.AddParameter("@<%=itemColumn.Name %>", SqlDbType.<%=GetSqlDbType(itemColumn) %>, <%=SqlNativeTypeToDbType[itemColumn.NativeType.ToString()]=="String"?"string.IsNullOrEmpty(Model."+itemColumn.Name+")?(object)DBNull.Value:(object)Model."+itemColumn.Name+"":"Model."+itemColumn.Name   %>);
                         <%
                        if (!(bool)itemColumn.ExtendedProperties["CS_isIdentity"].Value)
                        	{
@@ -108,14 +118,59 @@ namespace DAL
                        	}else id=itemColumn.Name;
                     }%>
                     string query = String.Format("Update <%=item.Name %> Set {0} Where <%=id %> = @<%=id %>", queryParameters.ToString());
-                    SqlDataReader reader = sql.ExecuteSqlReader(query);
+                    SqlDataReader reader = Sql.ExecuteSqlReader(query);
         		}
                 
+                public void Delete(string where) {
+                    string sqlText = "delete from <%=item.Name%> where " + where;
+                    Sql.ExecuteSql(sqlText);
+                }                
                 
+                public void Insert()
+        		{
+        			StringBuilder queryParameters = new StringBuilder();
+                   <%
+                    isFirst = true;
+                    foreach(var itemColumn in item.Columns){
+                        %>
+                        <%
+                       if (!(bool)itemColumn.ExtendedProperties["CS_isIdentity"].Value)
+                       	{
+                       	    %>
+                    queryParameters.Append("<%=isFirst==false?",":"" %>@<%=itemColumn.Name %> ");
+                    Sql.AddParameter("@<%=itemColumn.Name %>", SqlDbType.<%=GetSqlDbType(itemColumn) %>, <%=SqlNativeTypeToDbType[itemColumn.NativeType.ToString()]=="String"?"string.IsNullOrEmpty(Model."+itemColumn.Name+")?(object)DBNull.Value:(object)Model."+itemColumn.Name+"":"Model."+itemColumn.Name   %>);
+                            <%
+                            isFirst = false;
+                       	}
+                    }%>
+                    string query = String.Format("Insert Into <%=item.Name %>({0}) Values({1})", queryParameters.ToString().Replace("@",""),queryParameters.ToString());
+                    SqlDataReader reader = Sql.ExecuteSqlReader(query);
+        		}
                 
+                public void Select(int topCount,string sort="") {
+                    SqlDataReader reader = Sql.ExecuteSqlReader("SELECT top "+topCount+" * FROM dbo.<%=item.Name%> "+(string.IsNullOrEmpty(sort)?"":"ORDER BY "+sort));
+                    ListModel = new List<Models.<%=item.Name%>Model>();
+                    while (reader.Read())
+                    {
+                        Model = new Models.<%=item.Name%>Model();
+                        this.LoadFromReader(reader);
+                        ListModel.Add(Model);
+                    }
+                    if (!reader.IsClosed) reader.Close();
+                }
+                public void Select(string where="1=1") {
+                    SqlDataReader reader = Sql.ExecuteSqlReader("SELECT * FROM dbo.<%=item.Name%> where " + where);
+                    ListModel = new List<Models.<%=item.Name%>Model>();
+                    while (reader.Read())
+                    {
+                        Model = new Models.<%=item.Name%>Model();
+                        this.LoadFromReader(reader);
+                        ListModel.Add(Model);
+                    }
+                    if (!reader.IsClosed) reader.Close();
+                }
             }
             <%
-            break;
             }%>
         }
     
