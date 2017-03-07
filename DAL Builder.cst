@@ -163,38 +163,7 @@ namespace DAL
              <%} %>
         }
         #endregion
-        
-        #region models
-        public class Models{
-            <%foreach (var item in SourceDatabase.Tables)
-        	{
-             %>
-             public class <%=item.Name %>Model{
-                <%foreach (var itemColumn in item.Columns)
-                {%>
-                <%=itemColumn.SystemType.Name +" _"+itemColumn.Name+";" %>
-                public <%=itemColumn.SystemType.Name +" "+itemColumn.Name+"" %>{ get{ return _<%=itemColumn.Name%>; } set{ _<%=itemColumn.Name%> = value;}}
-                <%}%>
-             }
-             <%
-        	} %>
-            
-            <%foreach (var item in SourceDatabase.Views)
-        	{
-             %>
-             public class <%=item.Name %>Model{
-                <%foreach (var itemColumn in item.Columns)
-                {%>
-                <%=itemColumn.SystemType.Name +" _"+itemColumn.Name+";" %>
-                public <%=itemColumn.SystemType.Name +" "+itemColumn.Name+"" %>{ get{ return _<%=itemColumn.Name%>; } set{ _<%=itemColumn.Name%> = value;}}
-                <%}%>
-             }
-             <%
-            } %>
-            
-        }
-        #endregion
-        
+                
         #region table
         public class Tables{       
             <%foreach (var item in SourceDatabase.Tables)
@@ -378,6 +347,36 @@ namespace DAL
             }
             	<%
                 } %>
+        }
+        #endregion
+        #region models
+        public class Models{
+            <%foreach (var item in SourceDatabase.Tables)
+        	{
+             %>
+             public class <%=item.Name %>Model{
+                <%foreach (var itemColumn in item.Columns)
+                {%>
+                <%=itemColumn.SystemType.Name +" _"+itemColumn.Name+";" %>
+                public <%=itemColumn.SystemType.Name +" "+itemColumn.Name+"" %>{ get{ return _<%=itemColumn.Name%>; } set{ _<%=itemColumn.Name%> = value;}}
+                <%}%>
+             }
+             <%
+        	} %>
+            
+            <%foreach (var item in SourceDatabase.Views)
+        	{
+             %>
+             public class <%=item.Name %>Model{
+                <%foreach (var itemColumn in item.Columns)
+                {%>
+                <%=itemColumn.SystemType.Name +" _"+itemColumn.Name+";" %>
+                public <%=itemColumn.SystemType.Name +" "+itemColumn.Name+"" %>{ get{ return _<%=itemColumn.Name%>; } set{ _<%=itemColumn.Name%> = value;}}
+                <%}%>
+             }
+             <%
+            } %>
+            
         }
         #endregion
     
