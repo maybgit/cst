@@ -1446,25 +1446,4 @@ public string GetPrimaryKeyType(TableSchema table)
 //{
 //	return null;//return this.GetClassName(this.SourceTable) + ".cs";
 //}
-/*
-public class Views{
-        <%foreach (var item in SourceDatabase.Views)
-        {%>
-        public class <%=item.Name%>{
-            public const string ViewName = "<%=item.Name%>";
-            <%foreach (var itemColumn in item.Columns)
-            {%>
-            <%=itemColumn.SystemType.Name +" _"+itemColumn.Name+";" %>
-            public <%=itemColumn.SystemType.Name +" "+itemColumn.Name+"" %>
-            {
-                get{ return _<%=itemColumn.Name%>; }
-                set{ _<%=itemColumn.Name%> = value;}
-            }
-            <%}%>
-        }
-        <%}%>
-        
-        
-    }
-*/
 </script>
