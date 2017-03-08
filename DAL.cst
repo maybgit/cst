@@ -34,7 +34,7 @@ namespace DAL
     //[DebuggerStepThrough]
     public class SqlService
     {
-    <%
+<%
         Regex reg = new Regex(@"[\u4e00-\u9fa5]");
         CommandSchema[] procs = SourceDatabase.Provider.GetCommands(SourceDatabase.ConnectionString,SourceDatabase);
         SourceDatabase.IncludeFunctions=true;
@@ -166,7 +166,7 @@ namespace DAL
         }
         #endregion
                 
-        #region table
+        #region tables
         public class Tables{       
             <%foreach (var item in SourceDatabase.Tables)
             {
@@ -261,8 +261,8 @@ namespace DAL
                             isFirst = false;
                        	}
                     }%>
-                    string query = String.Format("Insert Into <%=item.Name %>({0}) Values({1})", queryParameters.ToString().Replace("@",""),queryParameters.ToString());
-                    SqlDataReader reader = Sql.ExecuteSqlReader(query);
+                    string sqlText = String.Format("Insert Into <%=item.Name %>({0}) Values({1})", queryParameters.ToString().Replace("@",""),queryParameters.ToString());
+                    Sql.ExecuteSql(sqlText);
         		}
                 
                 public void Select(int topCount,string sort="") {
@@ -360,6 +360,9 @@ namespace DAL
                 <%foreach (var itemColumn in item.Columns)
                 {%>
                 <%=itemColumn.SystemType.Name +" _"+itemColumn.Name+";" %>
+                /// <summary>
+                /// <%=itemColumn.Description %>
+                /// </summary>
                 public <%=itemColumn.SystemType.Name +" "+itemColumn.Name+"" %>{ get{ return _<%=itemColumn.Name%>; } set{ _<%=itemColumn.Name%> = value;}}
                 <%}%>
              }
