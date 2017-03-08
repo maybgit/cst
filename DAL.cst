@@ -4,6 +4,7 @@
 <%@ Assembly Name="SchemaExplorer" %>
 <%@ Import Namespace="SchemaExplorer" %>
 <%@ Property Name="SourceDatabase" Type="SchemaExplorer.DatabaseSchema" IncludeFunctions="false" %>
+<%@ Property Name="Namespace" Type="String" Default="DAL" %>
 <%@ Import Namespace="System.Text" %>
 <%@ Import Namespace="System.Linq" %>
 <%@ Import Namespace="System.Text.RegularExpressions" %>
@@ -29,7 +30,7 @@ using System.Collections.Generic;
 /*
  * author：mayb
  */
-namespace DAL
+namespace <%=Namespace %>
 {
     //[DebuggerStepThrough]
     public class SqlService
