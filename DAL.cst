@@ -362,7 +362,7 @@ namespace <%=Namespace %>
                 {%>
                 <%=itemColumn.SystemType.Name +" _"+itemColumn.Name+";" %>
                 /// <summary>
-                /// <%=itemColumn.Description %>
+                /// <%--<%=itemColumn.Description %>--%>
                 /// </summary>
                 public <%=itemColumn.SystemType.Name +" "+itemColumn.Name+"" %>{ get{ return _<%=itemColumn.Name%>; } set{ _<%=itemColumn.Name%> = value;}}
                 <%}%>

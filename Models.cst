@@ -1,0 +1,64 @@
+﻿<%@ Template Language="C#" TargetLanguage="C#" %>
+<%@ Assembly Name="CodeSmith.BaseTemplates" %>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Property Name="SourceDatabase" Type="SchemaExplorer.DatabaseSchema" Description="数据库" %>
+<%@ Property Name="Namespace" Type="String" Default="Models" Description="命名空间" %>
+<%@ Property Name="IsSingelFile" Type="Boolean" Default="true" Description="单文件模式" %>
+<%@ Import Namespace="SchemaExplorer" %>
+<%@ Import Namespace="CodeSmith.BaseTemplates" %>
+<%@ Import Namespace="System.IO" %>
+<%@ Register Name="TableModel" Template="TableModel.cst" %>
+<%@ Register Name="ViewModel" Template="ViewModel.cst" %>
+<%@ Register Name="TablesAndViewsModel" Template="TablesAndViewsModel.cst" %>
+<script runat="template">
+private string _outputDirectory = String.Empty;
+[Editor(typeof(System.Windows.Forms.Design.FolderNameEditor), typeof(System.Drawing.Design.UITypeEditor))] 
+[Optional]
+[Category("Output")]
+public string OutputDirectory 
+{
+	get
+	{
+		if (_outputDirectory.Length == 0) 
+			return ".\\";
+		return _outputDirectory;
+	}
+	set
+	{
+		_outputDirectory = value;
+		if (_outputDirectory.EndsWith("\\") == false)
+		{
+			_outputDirectory += "\\";
+		}
+	} 
+}
+
+public override void Render(TextWriter writer){
+    string outputDirectory = Path.GetFullPath(this.OutputDirectory);
+    if (IsSingelFile)
+	{
+        TablesAndViewsModel model = this.Create<TablesAndViewsModel>();
+        this.CopyPropertiesTo(model);
+        model.SourceDatabase = SourceDatabase;
+        string path = Path.Combine(outputDirectory,"Models.cs");
+        model.RenderToFile(path,true);
+	}else{
+        foreach (var item in SourceDatabase.Tables)
+    	{
+    		TableModel model = this.Create<TableModel>();
+            this.CopyPropertiesTo(model);
+            model.SourceTable = item;
+            string path = Path.Combine(outputDirectory,item.Name+"Model.cs");
+            model.RenderToFile(path,true);
+    	}
+        foreach (var item in SourceDatabase.Views)
+    	{
+    		 ViewModel model = this.Create<ViewModel>();
+            this.CopyPropertiesTo(model);
+            model.SourceView = item;
+            string path = Path.Combine(outputDirectory,item.Name+"Model.cs");
+            model.RenderToFile(path,true);
+    	}
+    }
+}
+</script>

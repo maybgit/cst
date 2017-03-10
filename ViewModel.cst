@@ -1,0 +1,25 @@
+﻿<%@ Template Language="C#" TargetLanguage="C#" Inherits="CodeSmith.BaseTemplates.OutputFileCodeTemplate" %>
+<%@ Assembly Name="CodeSmith.BaseTemplates" %>
+<%@ Import Namespace="CodeSmith.BaseTemplates" %>
+<%@ Import Namespace="System.IO" %>
+<%@ Property Name="SourceView" Type="SchemaExplorer.ViewSchema" IncludeFunctions="false" %>
+<%@ Property Name="Namespace" Type="String" Default="Models" %>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer" %>
+using System;
+namespace <%=Namespace %>{
+    public class <%=SourceView.Name %>Model{
+    <%foreach (var item in SourceView.Columns)
+    {%>
+    <%=item.SystemType.Name +" _"+item.Name+";" %>
+    <%--/// <summary>
+    /// <%=item.Description.Replace("/\n/","") %>
+    /// </summary>--%>
+    public <%=item.SystemType.Name +" "+item.Name+"" %>
+    { 
+        get { return _<%=item.Name%>; } 
+        set { _<%=item.Name%> = value; }
+    }
+    <%}%>
+    }
+}
