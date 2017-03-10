@@ -1,0 +1,7 @@
+﻿<%@ Template Language="C#" TargetLanguage="Text" Debug="True" %>
+<%@ Import Namespace="System.IO" %>
+<script runat="template">
+public override void Render(TextWriter writer){
+    base.Render(writer);
+}
+</script>
