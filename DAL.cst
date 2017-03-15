@@ -289,6 +289,11 @@ namespace <%=Namespace %>
                     }
                     if (!reader.IsClosed) reader.Close();
                 }
+                public DataTable SelectToDataTable(string columns="",string where="",string orderBy="") {
+                    DataSet ds = Sql.ExecuteSqlDataSet(string.Format("SELECT {0} FROM dbo.<%=item.Name%> {1} {2}",columns == "" ? "*" : columns,where==""?"":" where "+where,orderBy==""?"":" order by "+orderBy));
+                    if(null!=ds && ds.Tables.Count>0)return ds.Tables[0];
+                    return null;
+                }
             }
             <%
             }%>
@@ -406,165 +411,25 @@ namespace <%=Namespace %>
         #endregion Protected Member Variables
 
         #region Contructors
-        public SqlService()
-        {
-            _connectionString = ConfigurationSettings.AppSettings["ConnectionString"];
-        }
-
-        public SqlService(string connectionString)
-        {
-            _connectionString = connectionString;
-        }
-
-        public SqlService(string server, string database, string user, string password)
-        {
-            this.ConnectionString = "Server=" + server + ";Database=" + database + ";User ID=" + user + ";Password=" + password + ";";
-        }
-
-        public SqlService(string server, string database)
-        {
-            this.ConnectionString = "Server=" + server + ";Database=" + database + ";Integrated Security=true;";
-        }
-
-        public SqlService(SqlConnection connection)
-        {
-            this.Connection = connection;
-            this.AutoCloseConnection = false;
-        }
+        public SqlService() {_connectionString = ConfigurationSettings.AppSettings["ConnectionString"]; }
+        public SqlService(string connectionString) {_connectionString = connectionString; }
+        public SqlService(string server, string database, string user, string password) {this.ConnectionString = "Server=" + server + ";Database=" + database + ";User ID=" + user + ";Password=" + password + ";"; }
+        public SqlService(string server, string database) {this.ConnectionString = "Server=" + server + ";Database=" + database + ";Integrated Security=true;"; }
+        public SqlService(SqlConnection connection) {this.Connection = connection; this.AutoCloseConnection = false; } 
         #endregion Contructors
 
         #region Properties
-        public string ConnectionString
-        {
-            get
-            {
-                return _connectionString;
-            }
-            set
-            {
-                _connectionString = value;
-            }
-        }
-
-        public int CommandTimeout
-        {
-            get
-            {
-                return _commandTimeout;
-            }
-            set
-            {
-                _commandTimeout = value;
-            }
-        }
-
-        public bool IsSingleRow
-        {
-            get
-            {
-                return _isSingleRow;
-            }
-            set
-            {
-                _isSingleRow = value;
-            }
-        }
-
-        public bool AutoCloseConnection
-        {
-            get
-            {
-                return _autoCloseConnection;
-            }
-            set
-            {
-                _autoCloseConnection = value;
-            }
-        }
-
-        public SqlConnection Connection
-        {
-            get
-            {
-                return _connection;
-            }
-            set
-            {
-                _connection = value;
-                this.ConnectionString = _connection.ConnectionString;
-            }
-        }
-
-        public SqlTransaction Transaction
-        {
-            get
-            {
-                return _transaction;
-            }
-            set
-            {
-                _transaction = value;
-            }
-        }
-
-        public bool ConvertEmptyValuesToDbNull
-        {
-            get
-            {
-                return _convertEmptyValuesToDbNull;
-            }
-            set
-            {
-                _convertEmptyValuesToDbNull = value;
-            }
-        }
-
-        public bool ConvertMinValuesToDbNull
-        {
-            get
-            {
-                return _convertMinValuesToDbNull;
-            }
-            set
-            {
-                _convertMinValuesToDbNull = value;
-            }
-        }
-
-        public bool ConvertMaxValuesToDbNull
-        {
-            get
-            {
-                return _convertMaxValuesToDbNull;
-            }
-            set
-            {
-                _convertMaxValuesToDbNull = value;
-            }
-        }
-
-        public SqlParameterCollection Parameters
-        {
-            get
-            {
-                return _parameterCollection;
-            }
-        }
-
-        public int ReturnValue
-        {
-            get
-            {
-                if (_parameterCollection.Contains("@ReturnValue"))
-                {
-                    return (int)_parameterCollection["@ReturnValue"].Value;
-                }
-                else
-                {
-                    throw new Exception("You must call the AddReturnValueParameter method before executing your request.");
-                }
-            }
-        }
+        public string ConnectionString {get {return _connectionString; } set {_connectionString = value; } }
+        public int CommandTimeout {get {return _commandTimeout; } set {_commandTimeout = value; } }
+        public bool IsSingleRow {get {return _isSingleRow; } set {_isSingleRow = value; } }
+        public bool AutoCloseConnection {get {return _autoCloseConnection; } set {_autoCloseConnection = value; } }
+        public SqlConnection Connection {get {return _connection; } set {_connection = value; this.ConnectionString = _connection.ConnectionString; } }
+        public SqlTransaction Transaction {get {return _transaction; } set {_transaction = value; } }
+        public bool ConvertEmptyValuesToDbNull {get {return _convertEmptyValuesToDbNull; } set {_convertEmptyValuesToDbNull = value; } }
+        public bool ConvertMinValuesToDbNull {get {return _convertMinValuesToDbNull; } set {_convertMinValuesToDbNull = value; } }
+        public bool ConvertMaxValuesToDbNull {get {return _convertMaxValuesToDbNull; } set {_convertMaxValuesToDbNull = value; } }
+        public SqlParameterCollection Parameters {get {return _parameterCollection; } }
+        public int ReturnValue {get {if (_parameterCollection.Contains("@ReturnValue")) {return (int)_parameterCollection["@ReturnValue"].Value; } else {throw new Exception("You must call the AddReturnValueParameter method before executing your request."); } } } 
         #endregion Properties
 
         #region Execute Methods
@@ -578,6 +443,7 @@ namespace <%=Namespace %>
             cmd.Connection = _connection;
             if (_transaction != null) cmd.Transaction = _transaction;
             cmd.CommandType = CommandType.Text;
+            this.CopyParameters(cmd);
             cmd.ExecuteNonQuery();
             cmd.Dispose();
 
@@ -619,7 +485,7 @@ namespace <%=Namespace %>
             cmd.Connection = _connection;
             if (_transaction != null) cmd.Transaction = _transaction;
             cmd.CommandType = CommandType.Text;
-
+            this.CopyParameters(cmd);
             reader = cmd.ExecuteXmlReader();
             cmd.Dispose();
 
@@ -638,7 +504,7 @@ namespace <%=Namespace %>
             if (_transaction != null) cmd.Transaction = _transaction;
             cmd.CommandText = sql;
             cmd.CommandType = CommandType.Text;
-
+            this.CopyParameters(cmd);
             da.SelectCommand = cmd;
 
             da.Fill(ds);
@@ -662,7 +528,7 @@ namespace <%=Namespace %>
             if (_transaction != null) cmd.Transaction = _transaction;
             cmd.CommandText = sql;
             cmd.CommandType = CommandType.Text;
-
+            this.CopyParameters(cmd);
             da.SelectCommand = cmd;
 
             da.Fill(ds, tableName);
@@ -685,7 +551,7 @@ namespace <%=Namespace %>
             if (_transaction != null) cmd.Transaction = _transaction;
             cmd.CommandText = sql;
             cmd.CommandType = CommandType.Text;
-
+            this.CopyParameters(cmd);
             da.SelectCommand = cmd;
 
             da.Fill(dataSet, tableName);
