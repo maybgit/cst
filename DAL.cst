@@ -44,10 +44,17 @@ namespace <%=Namespace %>
 %>
         #region functions
         public class Functions{
+            static T Exec<T>(string returnValueType,string funName,string paras) {
+                string sqlText = string.Format("select {0} dbo.{1}({2})", returnValueType == "DataTable" ? "* from" : "", funName, paras);
+                DataSet ds = Sql.ExecuteSqlDataSet(sqlText);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0 && !Convert.IsDBNull(ds.Tables[0].Rows[0][0])) return (T)ds.Tables[0].Rows[0][0];
+                return default(T);
+            }
             <% foreach (var item in allCommands)
             	{
             		 if(!procs.Contains(item)){
                         string paras = "",paras2="",name="";
+                        StringBuilder strb = new StringBuilder();
                         string returnValueType = item.CommandResults.ToString()=="dbo.1"?"DataTable": DbTypeCSharp[item.ReturnValueParameter.DataType.ToString()];
                         foreach (var itemPara in item.InputParameters)
                     	{
@@ -55,13 +62,14 @@ namespace <%=Namespace %>
                             name = reg.IsMatch(name)?"@name"+item.InputParameters.IndexOf(itemPara):itemPara.Name;
                             paras += paras==""?DbTypeCSharp[itemPara.DataType.ToString()]+" "+ name.Replace("@",""):","+DbTypeCSharp[itemPara.DataType.ToString()]+" "+ name.Replace("@","") ;
                             paras2 += paras2==""?name:","+name;
+                            strb.AppendLine(string.Format("Sql.AddParameter(new SqlParameter(\"{0}\",{1}));",name,name.Replace("@","")));
+                            strb.Append("                ");
                     	}
                         %>
             public static <%=returnValueType %> <%=item.Name %>(<%=paras%>){
-                string sqlText = string.Format("<%=returnValueType=="DataTable"?"select * from dbo."+item.Name+"({0})":"select dbo."+item.Name+"({0})" %>",<%=paras2==""?"\"\"":paras2.Replace("@","") %>);
-                DataSet ds = new SqlService().ExecuteSqlDataSet(sqlText);
-                if(ds!=null && ds.Tables.Count > 0 <%=returnValueType=="DataTable"?"":" && ds.Tables[0].Rows.Count>0"%>) return <%=returnValueType=="DataTable"?"ds.Tables[0]":"("+returnValueType+")ds.Tables[0].Rows[0][0]"%>;
-                <%=returnValueType=="DataTable"? "return null;":"object obj = 0; return ("+returnValueType+")obj;" %>
+                Sql.Reset();
+                <%=strb.ToString() %>
+                return Exec<<%=returnValueType%>>("<%=returnValueType%>","<%=item.Name%>",<%=paras2==""?"\"\"":"\""+paras2+"\"" %>);
             }
                         <%
                      }
@@ -71,8 +79,6 @@ namespace <%=Namespace %>
         
         #region procedures
         public class Procedures{
-            static SqlService sql;
-            public static SqlService Sql { get { return sql ?? (sql = new SqlService()); } set { sql = value; } }
             <% 
                 string[,] strs;
                 foreach (var item in procs)
@@ -176,8 +182,6 @@ namespace <%=Namespace %>
             %>
             public class <%=item.Name%>{
                 public const string TableName = "<%=item.Name%>";
-                SqlService sql;
-                public SqlService Sql{ get { return sql??(sql = new SqlService()); } set { sql = value; } }
                 Models.<%=item.Name%>Model model;
                 public Models.<%=item.Name%>Model Model { get { return model ?? (model = new Models.<%=item.Name%>Model()); } set { model = value; } }
                 public List<Models.<%=item.Name%>Model> ListModel;
@@ -306,8 +310,6 @@ namespace <%=Namespace %>
             	{%>
             public class <%=item.Name %>{
                 public const string ViewName = "<%=item.Name%>";
-                SqlService sql;
-                public SqlService Sql{ get { return sql??(sql = new SqlService()); } set { sql = value; } }
                 Models.<%=item.Name%>Model model;
                 public Models.<%=item.Name%>Model Model { get { return model ?? (model = new Models.<%=item.Name%>Model()); } set { model = value; } }
                 public List<Models.<%=item.Name%>Model> ListModel;
@@ -430,6 +432,8 @@ namespace <%=Namespace %>
         public bool ConvertMaxValuesToDbNull {get {return _convertMaxValuesToDbNull; } set {_convertMaxValuesToDbNull = value; } }
         public SqlParameterCollection Parameters {get {return _parameterCollection; } }
         public int ReturnValue {get {if (_parameterCollection.Contains("@ReturnValue")) {return (int)_parameterCollection["@ReturnValue"].Value; } else {throw new Exception("You must call the AddReturnValueParameter method before executing your request."); } } } 
+        static SqlService sql;
+        public static SqlService Sql { get { return sql ?? (sql = new SqlService()); } set { sql = value; } }
         #endregion Properties
 
         #region Execute Methods
