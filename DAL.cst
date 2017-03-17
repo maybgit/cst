@@ -47,46 +47,36 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb.DAL":Namespace %>
             string idName = null;
         %>
         public class <%=item.Name%>{
-            Models.<%=item.Name%>Model model;
-            public Models.<%=item.Name%>Model Model { get { return model ?? (model = new Models.<%=item.Name%>Model()); } set { model = value; } }
-            public List<Models.<%=item.Name%>Model> Models;
+            public Models.<%=item.Name%>Model Model { get;set; }
+            public List<Models.<%=item.Name%>Model> Models{ get; set; }
             public SqlService Sql = new SqlService();
             public <%=item.Name %>(){ }
+            void ReadModels(SqlDataReader reader) {
+                Models = new List<Models.<%=item.Name%>Model>();
+                while (reader.Read())
+                {
+                    Models.Add(ReadModel(reader));
+                }
+                if (!reader.IsClosed) reader.Close();
+            }
             public <%= item.Name %>(int id)
             {
-                Sql.AddParameter("@<%= item.PrimaryKey.MemberColumns[0].Name %>", SqlDbType.<%=SqlNativeSqlDb[item.PrimaryKey.MemberColumns[0].NativeType.ToString()] %>, id);
-                SqlDataReader reader = Sql.ExecuteSqlReader("SELECT * FROM dbo.<%= item.Name %> WHERE <%= item.PrimaryKey.MemberColumns[0].Name %> = @<%= item.PrimaryKey.MemberColumns[0].Name %>");
-                
-                if (reader.Read()) 
-                {
-                    this.LoadFromReader(reader);
-                    reader.Close();
-                }
-                else
-                {
-                    if (!reader.IsClosed) reader.Close();
-                    throw new ApplicationException("<%= item.Name %> does not exist.");
-                }
+                Sql.AddParameter("@ID", SqlDbType.Int, id);
+                SqlDataReader reader = Sql.ExecuteSqlReader("SELECT * FROM dbo.<%= item.Name %> WHERE ID = @ID");
+                ReadModels(reader);
             }
-            
-            public <%= item.Name %>(SqlDataReader reader)
+            Models.<%=item.Name%>Model ReadModel(SqlDataReader reader)
             {
-                this.LoadFromReader(reader);
-            }
-            
-            protected void LoadFromReader(SqlDataReader reader)
-            {
-                if (reader != null && !reader.IsClosed)
+                Model = new Models.<%=item.Name%>Model();
+            <% foreach (var itemColumn in item.Columns)
                 {
-                <% foreach (var itemColumn in item.Columns)
-                    {
-                    int index = item.Columns.IndexOf(itemColumn);
-                    string dataType = DbDataReader[itemColumn.DataType.ToString()];
-                    %>
-                    if(!reader.IsDBNull(<%=index%>)) Model.<%=itemColumn.Name %> = <%=dataType!="GetBytes"?"reader."+dataType+"("+index+")":"null" %>;
-                    <%
-                    } %>
-                }
+                int index = item.Columns.IndexOf(itemColumn);
+                string dataType = DbDataReader[itemColumn.DataType.ToString()];
+                %>
+                if(!reader.IsDBNull(<%=index%>)) Model.<%=itemColumn.Name %> = <%=dataType!="GetBytes"?"reader."+dataType+"("+index+")":"null" %>;
+                <%
+                } %>
+                return Model;
             }
             
             public void Update()
@@ -139,25 +129,11 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb.DAL":Namespace %>
             
             public void Select(int topCount,string sort="") {
                 SqlDataReader reader = Sql.ExecuteSqlReader("SELECT top "+topCount+" * FROM dbo.<%=item.Name%> "+(string.IsNullOrEmpty(sort)?"":"ORDER BY "+sort));
-                Models = new List<Models.<%=item.Name%>Model>();
-                while (reader.Read())
-                {
-                    Model = new Models.<%=item.Name%>Model();
-                    this.LoadFromReader(reader);
-                    Models.Add(Model);
-                }
-                if (!reader.IsClosed) reader.Close();
+                ReadModels(reader);
             }
             public void Select(string where="1=1") {
                 SqlDataReader reader = Sql.ExecuteSqlReader("SELECT * FROM dbo.<%=item.Name%> where " + where);
-                Models = new List<Models.<%=item.Name%>Model>();
-                while (reader.Read())
-                {
-                    Model = new Models.<%=item.Name%>Model();
-                    this.LoadFromReader(reader);
-                    Models.Add(Model);
-                }
-                if (!reader.IsClosed) reader.Close();
+                ReadModels(reader);
             }
             public DataTable SelectToDataTable(string columns="",string where="",string orderBy="") {
                 DataSet ds = Sql.ExecuteSqlDataSet(string.Format("SELECT {0} FROM dbo.<%=item.Name%> {1} {2}",columns == "" ? "*" : columns,where==""?"":" where "+where,orderBy==""?"":" order by "+orderBy));
@@ -175,57 +151,50 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb.DAL":Namespace %>
         <% foreach (var item in SourceDatabase.Views)
             {%>
         public class <%=item.Name %>{
-            Models.<%=item.Name%>Model model;
-            public Models.<%=item.Name%>Model Model { get { return model ?? (model = new Models.<%=item.Name%>Model()); } set { model = value; } }
-            public List<Models.<%=item.Name%>Model> Models;
+            public Models.<%=item.Name%>Model Model { get;set; }
+            public List<Models.<%=item.Name%>Model> Models{ get; set; }
             public SqlService Sql = new SqlService();
             public <%=item.Name %>(){ }
-            public <%= item.Name %>(SqlDataReader reader)
-            {
-                this.LoadFromReader(reader);
-            }
-            protected void LoadFromReader(SqlDataReader reader)
-            {
-                if (reader != null && !reader.IsClosed)
+            void ReadModels(SqlDataReader reader) {
+                Models = new List<Models.<%=item.Name%>Model>();
+                while (reader.Read())
                 {
-                <% foreach (var itemColumn in item.Columns)
-                    {
-                    int index = item.Columns.IndexOf(itemColumn);
-                    string dataType = DbDataReader[itemColumn.DataType.ToString()];
-                    %>
-                    if(!reader.IsDBNull(<%=index%>)) Model.<%=itemColumn.Name %> = <%=dataType!="GetBytes"?"reader."+dataType+"("+index+")":"null" %>;
-                    <%
-                    } %>
+                    Models.Add(ReadModel(reader));
                 }
+                if (!reader.IsClosed) reader.Close();
+            }
+            public <%= item.Name %>(int id)
+            {
+                Sql.AddParameter("@ID", SqlDbType.Int, id);
+                SqlDataReader reader = Sql.ExecuteSqlReader("SELECT * FROM dbo.<%= item.Name %> WHERE ID = @ID");
+                ReadModels(reader);
+            }
+            Models.<%=item.Name%>Model ReadModel(SqlDataReader reader)
+            {
+                Model = new Models.<%=item.Name%>Model();
+            <% foreach (var itemColumn in item.Columns)
+                {
+                int index = item.Columns.IndexOf(itemColumn);
+                string dataType = DbDataReader[itemColumn.DataType.ToString()];
+                %>
+                if(!reader.IsDBNull(<%=index%>)) Model.<%=itemColumn.Name %> = <%=dataType!="GetBytes"?"reader."+dataType+"("+index+")":"null" %>;
+                <%
+                } %>
+                return Model;
             }
             public void Select(int topCount,string sort="") {
                 SqlDataReader reader = Sql.ExecuteSqlReader("SELECT top "+topCount+" * FROM dbo.<%=item.Name%> "+(string.IsNullOrEmpty(sort)?"":"ORDER BY "+sort));
-                Models = new List<Models.<%=item.Name%>Model>();
-                while (reader.Read())
-                {
-                    Model = new Models.<%=item.Name%>Model();
-                    this.LoadFromReader(reader);
-                    Models.Add(Model);
-                }
-                if (!reader.IsClosed) reader.Close();
+                ReadModels(reader);
             }
             public void Select(string where="1=1") {
                 SqlDataReader reader = Sql.ExecuteSqlReader("SELECT * FROM dbo.<%=item.Name%> where " + where);
-                Models = new List<Models.<%=item.Name%>Model>();
-                while (reader.Read())
-                {
-                    Model = new Models.<%=item.Name%>Model();
-                    this.LoadFromReader(reader);
-                    Models.Add(Model);
-                }
-                if (!reader.IsClosed) reader.Close();
+                ReadModels(reader);
             }
             public DataTable SelectToDataTable(string columns="",string where="",string orderBy="") {
                 DataSet ds = Sql.ExecuteSqlDataSet(string.Format("SELECT {0} FROM dbo.<%=item.Name%> {1} {2}",columns == "" ? "*" : columns,where==""?"":" where "+where,orderBy==""?"":" order by "+orderBy));
                 if(null!=ds && ds.Tables.Count>0)return ds.Tables[0];
                 return null;
             }
-            
         }
             <%
             } %>
