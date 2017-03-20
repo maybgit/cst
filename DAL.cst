@@ -240,25 +240,33 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                 string[,] strs;
                 foreach (var item in procs)
                 {
-                    string name="",paras="";
+                    string name=""              //参数名称
+                          ,type=""              //参数类型
+                          ,paras=""             //参数串 [ref] 参数类型 参数名称
+                          ,inputParas=""        //输入参数名称，以逗号分隔
+                          ,inputTypeParas="";   //输入参数类型和名称 参数类型+参数名称 以逗号分隔
                     int index = 0;
                     strs = new string[item.InputParameters.Count+item.AllOutputParameters.Count,4];                    
                     foreach (var itemPara in item.InputParameters)
                     {
                         name = itemPara.Name;
-                        name = reg.IsMatch(name)?"name"+index:itemPara.Name;
+                        type = DbTypeCSharp[itemPara.DataType.ToString()];
+                        name = reg.IsMatch(name)?"name"+index:itemPara.Name.Replace("@","");
+                        inputParas+=name+",";
+                        inputTypeParas+= type+" "+ name+",";
                         strs[index,0] = "";
-                        strs[index,1] = DbTypeCSharp[itemPara.DataType.ToString()];
-                        strs[index,2] = name.Replace("@","");
+                        strs[index,1] = type;
+                        strs[index,2] = name;
                         strs[index,3] = itemPara.NativeType.ToString();
                         index++;
                     }
                     foreach (var itemPara in item.AllOutputParameters)
                     {
                         name = itemPara.Name;
+                        type = DbTypeCSharp[itemPara.DataType.ToString()];
                         name = reg.IsMatch(name)?"name"+index:itemPara.Name;
                         strs[index,0] = "ref";
-                        strs[index,1] = DbTypeCSharp[itemPara.DataType.ToString()];
+                        strs[index,1] = type;
                         strs[index,2] = name.Replace("@","");
                         strs[index,3] = itemPara.NativeType.ToString();
                         index++;
@@ -268,8 +276,10 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                         paras += strs[i,0]+" "+strs[i,1]+" "+strs[i,2]+",";
                     }
                     paras = paras.Trim(',');
+                    inputParas = inputParas.Trim(',');
+                    inputTypeParas = inputTypeParas.Trim(',');
                     %>
-            public static int <%=item.Name %>(<%=paras %>){
+            static void Set<%=item.Name %>(<%=inputTypeParas %>){
                 Sql.Reset();
                 <%
                 for (int i = 0; i < strs.GetLength(0); i++)
@@ -286,6 +296,9 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                 }
                 %>
                 Sql.AddReturnValueParameter();
+            }
+            public static int <%=item.Name %>(<%=paras %>){
+                Set<%=item.Name %>(<%=inputParas %>);
                 Sql.ExecuteSPReader("<%=item.Name%>");
                 <%for (int i = 0; i < strs.GetLength(0); i++)
                 {
@@ -299,22 +312,7 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
             }
             
             public static int <%=item.Name %>(<%=paras==""?"ref DataSet ds":"ref DataSet ds,"+paras %>){
-                Sql.Reset();
-                <%
-                for (int i = 0; i < strs.GetLength(0); i++)
-                {
-                    if(strs[i,0]==""){
-                    %>
-                Sql.AddParameter(new SqlParameter("@<%=strs[i,2]%>",<%=strs[i,2]%>));
-                    <%
-                    }else if(strs[i,0]=="ref"){
-                %>
-                Sql.AddOutputParameter("@<%=strs[i,2] %>",SqlDbType.<%=SqlNativeSqlDb[strs[i,3]]%>,int.MaxValue);
-                <%
-                    }
-                }
-                %>
-                Sql.AddReturnValueParameter();
+                Set<%=item.Name %>(<%=inputParas %>);
                 ds = Sql.ExecuteSPDataSet("<%=item.Name%>");
                 <%for (int i = 0; i < strs.GetLength(0); i++)
                 {
@@ -326,7 +324,6 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                 Sql.Disconnect();
                 return Sql.ReturnValue;
             }
-            
              <%} %>
         }
         #endregion
