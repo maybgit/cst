@@ -4,7 +4,7 @@
 <%@ Assembly Name="SchemaExplorer" %>
 <%@ Import Namespace="SchemaExplorer" %>
 <%@ Property Name="SourceDatabase" Type="SchemaExplorer.DatabaseSchema" IncludeFunctions="false" %>
-<%@ Property Name="Namespace" Type="String" Default="Mayb.DAL" %>
+<%@ Property Name="Namespace" Type="String" Default="Mayb" %>
 <%@ Property Name="ConnectionStringName" Type="String" Default="ConnectionString" Optional="True" %>
 <%@ Import Namespace="System.Text" %>
 <%@ Import Namespace="System.Linq" %>
@@ -32,7 +32,7 @@ using System.Collections.Generic;
  * file read only
  * author：mayb
  */
-namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb.DAL":Namespace %>
+namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
 {
 <%
     Regex reg = new Regex(@"[\u4e00-\u9fa5]");
@@ -40,898 +40,883 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb.DAL":Namespace %>
     SourceDatabase.IncludeFunctions=true;
     CommandSchema[] allCommands = SourceDatabase.Provider.GetCommands(SourceDatabase.ConnectionString,SourceDatabase);
 %>
-    #region tables
-    public class Tables{
-        <%foreach (var item in SourceDatabase.Tables)
+    public class DAL{
+        public class BaseTable<T>
         {
-            string idName = null;
-        %>
-        public class <%=item.Name%>{
-            public Models.<%=item.Name%>Model Model { get;set; }
-            public List<Models.<%=item.Name%>Model> Models{ get; set; }
+            public T Model { get; set; }
+            public List<T> Models { get; set; }
             public SqlService Sql = new SqlService();
-            public <%=item.Name %>(){ }
-            void ReadModels(SqlDataReader reader) {
-                Models = new List<Models.<%=item.Name%>Model>();
-                while (reader.Read())
-                {
-                    Models.Add(ReadModel(reader));
-                }
+            internal SqlDataReader reader;
+            internal StringBuilder queryParameters;
+            internal string TableName;
+            public BaseTable() { }
+            
+            protected void ReadModels(SqlDataReader reader,Func<SqlDataReader, T> fun)
+            {
+                Models = new List<T>();
+                while (reader.Read()){Models.Add(fun(reader));}
                 if (!reader.IsClosed) reader.Close();
             }
-            public <%= item.Name %>(int id)
+            public BaseTable(int id)
             {
                 Sql.AddParameter("@ID", SqlDbType.Int, id);
-                SqlDataReader reader = Sql.ExecuteSqlReader("SELECT * FROM dbo.<%= item.Name %> WHERE ID = @ID");
-                ReadModels(reader);
+                reader = Sql.ExecuteSqlReader("SELECT * FROM dbo."+TableName+" WHERE ID = @ID");
             }
-            Models.<%=item.Name%>Model ReadModel(SqlDataReader reader)
-            {
-                Model = new Models.<%=item.Name%>Model();
-            <% foreach (var itemColumn in item.Columns)
-                {
-                int index = item.Columns.IndexOf(itemColumn);
-                string dataType = DbDataReader[itemColumn.DataType.ToString()];
-                %>
-                if(!reader.IsDBNull(<%=index%>)) Model.<%=itemColumn.Name %> = <%=dataType!="GetBytes"?"reader."+dataType+"("+index+")":"null" %>;
-                <%
-                } %>
-                return Model;
-            }
-            
-            public void Update()
-            {
-                StringBuilder queryParameters = new StringBuilder();
-               <%
-                string id="";
-                bool isFirst = true;
-                foreach(var itemColumn in item.Columns){
-                    %>
-                Sql.AddParameter("@<%=itemColumn.Name %>", SqlDbType.<%=SqlNativeSqlDb[itemColumn.NativeType.ToString()] %>, <%=SqlNativeTypeToDbType[itemColumn.NativeType.ToString()]=="String"?"string.IsNullOrEmpty(Model."+itemColumn.Name+")?(object)DBNull.Value:(object)Model."+itemColumn.Name+"":"Model."+itemColumn.Name   %>);
-                    <%
-                   if (!(bool)itemColumn.ExtendedProperties["CS_isIdentity"].Value)
-                    {
-                        %>
-                queryParameters.Append("<%=isFirst==false?",":"" %> <%=itemColumn.Name %> = @<%=itemColumn.Name %> ");
-                        <%
-                        isFirst = false;
-                    }else id=itemColumn.Name;
-                }%>
-                string query = String.Format("Update <%=item.Name %> Set {0} Where <%=id %> = @<%=id %>", queryParameters.ToString());
+            internal void Update() {
+                string query = String.Format("Update {1} Set {0} Where ID = @ID", queryParameters.ToString(),TableName);
                 SqlDataReader reader = Sql.ExecuteSqlReader(query);
             }
-            
             public void Delete(string where) {
-                string sqlText = "delete from <%=item.Name%> where " + where;
+                string sqlText = "delete from "+TableName+" where " + where;
                 Sql.ExecuteSql(sqlText);
-            }                
-            
-            public void Insert()
+            }
+            internal void Insert()
             {
-                StringBuilder queryParameters = new StringBuilder();
-               <%
-                isFirst = true;
-                foreach(var itemColumn in item.Columns){
-                    %>
-                    <%
-                   if (!(bool)itemColumn.ExtendedProperties["CS_isIdentity"].Value)
-                    {
-                        %>
-                queryParameters.Append("<%=isFirst==false?",":"" %>@<%=itemColumn.Name %> ");
-                Sql.AddParameter("@<%=itemColumn.Name %>", SqlDbType.<%=SqlNativeSqlDb[itemColumn.NativeType.ToString()] %>, <%=SqlNativeTypeToDbType[itemColumn.NativeType.ToString()]=="String"?"string.IsNullOrEmpty(Model."+itemColumn.Name+")?(object)DBNull.Value:(object)Model."+itemColumn.Name+"":"Model."+itemColumn.Name   %>);
-                        <%
-                        isFirst = false;
-                    }
-                }%>
-                string sqlText = String.Format("Insert Into <%=item.Name %>({0}) Values({1})", queryParameters.ToString().Replace("@",""),queryParameters.ToString());
+                string sqlText = String.Format("Insert Into "+TableName+"({0}) Values({1})", queryParameters.ToString().Replace("@", ""), queryParameters.ToString());
                 Sql.ExecuteSql(sqlText);
             }
-            
-            public void Select(int topCount,string sort="") {
-                SqlDataReader reader = Sql.ExecuteSqlReader("SELECT top "+topCount+" * FROM dbo.<%=item.Name%> "+(string.IsNullOrEmpty(sort)?"":"ORDER BY "+sort));
-                ReadModels(reader);
+            internal void Select(string columns, string where, string orderBy, Func<SqlDataReader, T> fun)
+            {
+                reader = Sql.ExecuteSqlReader(string.Format("SELECT {0} FROM dbo.{3} {1} {2}", columns == "" ? "*" : columns, where == "" ? "" : " where " + where, orderBy == "" ? "" : " order by " + orderBy,TableName));
+                ReadModels(reader, fun);
             }
-            public void Select(string where="1=1") {
-                SqlDataReader reader = Sql.ExecuteSqlReader("SELECT * FROM dbo.<%=item.Name%> where " + where);
-                ReadModels(reader);
-            }
-            public DataTable SelectToDataTable(string columns="",string where="",string orderBy="") {
-                DataSet ds = Sql.ExecuteSqlDataSet(string.Format("SELECT {0} FROM dbo.<%=item.Name%> {1} {2}",columns == "" ? "*" : columns,where==""?"":" where "+where,orderBy==""?"":" order by "+orderBy));
-                if(null!=ds && ds.Tables.Count>0)return ds.Tables[0];
+            public DataTable SelectToDataTable(string columns = "", string where = "", string orderBy = "")
+            {
+                DataSet ds = Sql.ExecuteSqlDataSet(string.Format("SELECT {0} FROM dbo.{3} {1} {2}", columns == "" ? "*" : columns, where == "" ? "" : " where " + where, orderBy == "" ? "" : " order by " + orderBy,TableName));
+                if (null != ds && ds.Tables.Count > 0) return ds.Tables[0];
                 return null;
             }
-        }
-        <%
-        }%>
-    }
-    #endregion
-    
-    #region views
-    public class Views{
-        <% foreach (var item in SourceDatabase.Views)
-            {%>
-        public class <%=item.Name %>{
-            public Models.<%=item.Name%>Model Model { get;set; }
-            public List<Models.<%=item.Name%>Model> Models{ get; set; }
-            public SqlService Sql = new SqlService();
-            public <%=item.Name %>(){ }
-            void ReadModels(SqlDataReader reader) {
-                Models = new List<Models.<%=item.Name%>Model>();
-                while (reader.Read())
+         }
+         
+        #region tables
+        public class Tables{
+            <%foreach (var item in SourceDatabase.Tables)
+            {
+                string idName = null;
+            %>
+            public class <%=item.Name%>: BaseTable<Models.<%=item.Name%>Model>{
+                public <%=item.Name %>(){ TableName = "<%=item.Name %>"; }
+                public <%= item.Name %>(int id):base(id){ TableName = "<%=item.Name %>"; ReadModels(reader,ReadModel);}
+                Models.<%=item.Name%>Model ReadModel(SqlDataReader reader)
                 {
-                    Models.Add(ReadModel(reader));
+                    Model = new Models.<%=item.Name%>Model();
+                <% foreach (var itemColumn in item.Columns)
+                    {
+                    int index = item.Columns.IndexOf(itemColumn);
+                    string dataType = DbDataReader[itemColumn.DataType.ToString()];
+                    %>
+                    if(!reader.IsDBNull(<%=index%>)) Model.<%=itemColumn.Name %> = <%=dataType!="GetBytes"?"reader."+dataType+"("+index+")":"null" %>;
+                    <%
+                    } %>
+                    return Model;
                 }
-                if (!reader.IsClosed) reader.Close();
-            }
-            public <%= item.Name %>(int id)
-            {
-                Sql.AddParameter("@ID", SqlDbType.Int, id);
-                SqlDataReader reader = Sql.ExecuteSqlReader("SELECT * FROM dbo.<%= item.Name %> WHERE ID = @ID");
-                ReadModels(reader);
-            }
-            Models.<%=item.Name%>Model ReadModel(SqlDataReader reader)
-            {
-                Model = new Models.<%=item.Name%>Model();
-            <% foreach (var itemColumn in item.Columns)
+                
+                public new void Update()
                 {
-                int index = item.Columns.IndexOf(itemColumn);
-                string dataType = DbDataReader[itemColumn.DataType.ToString()];
-                %>
-                if(!reader.IsDBNull(<%=index%>)) Model.<%=itemColumn.Name %> = <%=dataType!="GetBytes"?"reader."+dataType+"("+index+")":"null" %>;
+                    queryParameters = new StringBuilder();
+                   <%
+                    string id="";
+                    bool isFirst = true;
+                    foreach(var itemColumn in item.Columns){
+                        %>
+                    Sql.AddParameter("@<%=itemColumn.Name %>", SqlDbType.<%=SqlNativeSqlDb[itemColumn.NativeType.ToString()] %>, <%=SqlNativeTypeToDbType[itemColumn.NativeType.ToString()]=="String"?"string.IsNullOrEmpty(Model."+itemColumn.Name+")?(object)DBNull.Value:(object)Model."+itemColumn.Name+"":"Model."+itemColumn.Name   %>);
+                        <%
+                       if (!(bool)itemColumn.ExtendedProperties["CS_isIdentity"].Value)
+                        {
+                            %>
+                    queryParameters.Append("<%=isFirst==false?",":"" %> <%=itemColumn.Name %> = @<%=itemColumn.Name %> ");
+                            <%
+                            isFirst = false;
+                        }else id=itemColumn.Name;
+                    }%>
+                    base.Update();
+                }
+             
+                public new void Insert()
+                {
+                    StringBuilder queryParameters = new StringBuilder();
+                   <%
+                    isFirst = true;
+                    foreach(var itemColumn in item.Columns){
+                        %>
+                        <%
+                       if (!(bool)itemColumn.ExtendedProperties["CS_isIdentity"].Value)
+                        {
+                            %>
+                    queryParameters.Append("<%=isFirst==false?",":"" %>@<%=itemColumn.Name %> ");
+                    Sql.AddParameter("@<%=itemColumn.Name %>", SqlDbType.<%=SqlNativeSqlDb[itemColumn.NativeType.ToString()] %>, <%=SqlNativeTypeToDbType[itemColumn.NativeType.ToString()]=="String"?"string.IsNullOrEmpty(Model."+itemColumn.Name+")?(object)DBNull.Value:(object)Model."+itemColumn.Name+"":"Model."+itemColumn.Name   %>);
+                            <%
+                            isFirst = false;
+                        }
+                    }%>
+                    base.Insert();
+                }
+                public void Select(string columns = "", string where = "", string orderBy = ""){base.Select(columns,where,orderBy,ReadModel);}
+            }
+            <%
+            }%>
+        }
+        #endregion
+        
+        #region views
+        public class Views{
+            <% foreach (var item in SourceDatabase.Views)
+                {%>
+            public class <%=item.Name %>: BaseTable<Models.<%=item.Name%>Model>{
+                public <%=item.Name %>(){ TableName = "<%=item.Name %>"; }
+                public <%= item.Name %>(int id):base(id){ TableName = "<%=item.Name %>"; ReadModels(reader,ReadModel);}
+                Models.<%=item.Name%>Model ReadModel(SqlDataReader reader)
+                {
+                    Model = new Models.<%=item.Name%>Model();
+                <% foreach (var itemColumn in item.Columns)
+                    {
+                    int index = item.Columns.IndexOf(itemColumn);
+                    string dataType = DbDataReader[itemColumn.DataType.ToString()];
+                    %>
+                    if(!reader.IsDBNull(<%=index%>)) Model.<%=itemColumn.Name %> = <%=dataType!="GetBytes"?"reader."+dataType+"("+index+")":"null" %>;
+                    <%
+                    } %>
+                    return Model;
+                }
+                public void Select(string columns = "", string where = "", string orderBy = ""){base.Select(columns,where,orderBy,ReadModel);}
+            }
                 <%
                 } %>
-                return Model;
-            }
-            public void Select(int topCount,string sort="") {
-                SqlDataReader reader = Sql.ExecuteSqlReader("SELECT top "+topCount+" * FROM dbo.<%=item.Name%> "+(string.IsNullOrEmpty(sort)?"":"ORDER BY "+sort));
-                ReadModels(reader);
-            }
-            public void Select(string where="1=1") {
-                SqlDataReader reader = Sql.ExecuteSqlReader("SELECT * FROM dbo.<%=item.Name%> where " + where);
-                ReadModels(reader);
-            }
-            public DataTable SelectToDataTable(string columns="",string where="",string orderBy="") {
-                DataSet ds = Sql.ExecuteSqlDataSet(string.Format("SELECT {0} FROM dbo.<%=item.Name%> {1} {2}",columns == "" ? "*" : columns,where==""?"":" where "+where,orderBy==""?"":" order by "+orderBy));
-                if(null!=ds && ds.Tables.Count>0)return ds.Tables[0];
-                return null;
-            }
         }
-            <%
-            } %>
-    }
-    #endregion
-    
-    #region functions
-    public class Functions{
-        static SqlService Sql = new SqlService();
-        static T Exec<T>(string returnValueType,string funName,string paras) {
-            string sqlText = string.Format("select {0} dbo.{1}({2})", returnValueType == "DataTable" ? "* from" : "", funName, paras);
-            DataSet ds = Sql.ExecuteSqlDataSet(sqlText);
-            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0 && !Convert.IsDBNull(ds.Tables[0].Rows[0][0])) return (T)ds.Tables[0].Rows[0][0];
-            return default(T);
+        #endregion
+        
+        #region functions
+        public class Functions{
+            static SqlService Sql = new SqlService();
+            static T Exec<T>(string returnValueType,string funName,string paras) {
+                string sqlText = string.Format("select {0} dbo.{1}({2})", returnValueType == "DataTable" ? "* from" : "", funName, paras);
+                DataSet ds = Sql.ExecuteSqlDataSet(sqlText);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0 && !Convert.IsDBNull(ds.Tables[0].Rows[0][0])) return (T)ds.Tables[0].Rows[0][0];
+                return default(T);
+            }
+            <% foreach (var item in allCommands)
+                {
+                     if(!procs.Contains(item)){
+                        string paras = "",paras2="",name="";
+                        StringBuilder strb = new StringBuilder();
+                        string returnValueType = item.CommandResults.ToString()=="dbo.1"?"DataTable": DbTypeCSharp[item.ReturnValueParameter.DataType.ToString()];
+                        foreach (var itemPara in item.InputParameters)
+                        {
+                            name = itemPara.Name;
+                            name = reg.IsMatch(name)?"@name"+item.InputParameters.IndexOf(itemPara):itemPara.Name;
+                            paras += paras==""?DbTypeCSharp[itemPara.DataType.ToString()]+" "+ name.Replace("@",""):","+DbTypeCSharp[itemPara.DataType.ToString()]+" "+ name.Replace("@","") ;
+                            paras2 += paras2==""?name:","+name;
+                            strb.AppendLine(string.Format("Sql.AddParameter(new SqlParameter(\"{0}\",{1}));",name,name.Replace("@","")));
+                            strb.Append("                ");
+                        }
+                        %>
+            public static <%=returnValueType %> <%=item.Name %>(<%=paras%>){
+                Sql.Reset();
+                <%=strb.ToString() %>
+                return Exec<<%=returnValueType%>>("<%=returnValueType%>","<%=item.Name%>",<%=paras2==""?"\"\"":"\""+paras2+"\"" %>);
+            }
+                        <%
+                     }
+                } %>
         }
-        <% foreach (var item in allCommands)
-            {
-                 if(!procs.Contains(item)){
-                    string paras = "",paras2="",name="";
-                    StringBuilder strb = new StringBuilder();
-                    string returnValueType = item.CommandResults.ToString()=="dbo.1"?"DataTable": DbTypeCSharp[item.ReturnValueParameter.DataType.ToString()];
+        #endregion
+        
+        #region procedures
+        public class Procedures{
+            static SqlService Sql = new SqlService();
+            <% 
+                string[,] strs;
+                foreach (var item in procs)
+                {
+                    string name="",paras="";
+                    int index = 0;
+                    strs = new string[item.InputParameters.Count+item.AllOutputParameters.Count,4];                    
                     foreach (var itemPara in item.InputParameters)
                     {
                         name = itemPara.Name;
-                        name = reg.IsMatch(name)?"@name"+item.InputParameters.IndexOf(itemPara):itemPara.Name;
-                        paras += paras==""?DbTypeCSharp[itemPara.DataType.ToString()]+" "+ name.Replace("@",""):","+DbTypeCSharp[itemPara.DataType.ToString()]+" "+ name.Replace("@","") ;
-                        paras2 += paras2==""?name:","+name;
-                        strb.AppendLine(string.Format("Sql.AddParameter(new SqlParameter(\"{0}\",{1}));",name,name.Replace("@","")));
-                        strb.Append("                ");
+                        name = reg.IsMatch(name)?"name"+index:itemPara.Name;
+                        strs[index,0] = "";
+                        strs[index,1] = DbTypeCSharp[itemPara.DataType.ToString()];
+                        strs[index,2] = name.Replace("@","");
+                        strs[index,3] = itemPara.NativeType.ToString();
+                        index++;
                     }
+                    foreach (var itemPara in item.AllOutputParameters)
+                    {
+                        name = itemPara.Name;
+                        name = reg.IsMatch(name)?"name"+index:itemPara.Name;
+                        strs[index,0] = "ref";
+                        strs[index,1] = DbTypeCSharp[itemPara.DataType.ToString()];
+                        strs[index,2] = name.Replace("@","");
+                        strs[index,3] = itemPara.NativeType.ToString();
+                        index++;
+                    }
+                    for (int i = 0; i < strs.GetLength(0); i++)
+                    {
+                        paras += strs[i,0]+" "+strs[i,1]+" "+strs[i,2]+",";
+                    }
+                    paras = paras.Trim(',');
                     %>
-        public static <%=returnValueType %> <%=item.Name %>(<%=paras%>){
-            Sql.Reset();
-            <%=strb.ToString() %>
-            return Exec<<%=returnValueType%>>("<%=returnValueType%>","<%=item.Name%>",<%=paras2==""?"\"\"":"\""+paras2+"\"" %>);
-        }
-                    <%
-                 }
-            } %>
-    }
-    #endregion
-    
-    #region procedures
-    public class Procedures{
-        static SqlService Sql = new SqlService();
-        <% 
-            string[,] strs;
-            foreach (var item in procs)
-            {
-                string name="",paras="";
-                int index = 0;
-                strs = new string[item.InputParameters.Count+item.AllOutputParameters.Count,4];                    
-                foreach (var itemPara in item.InputParameters)
-                {
-                    name = itemPara.Name;
-                    name = reg.IsMatch(name)?"name"+index:itemPara.Name;
-                    strs[index,0] = "";
-                    strs[index,1] = DbTypeCSharp[itemPara.DataType.ToString()];
-                    strs[index,2] = name.Replace("@","");
-                    strs[index,3] = itemPara.NativeType.ToString();
-                    index++;
-                }
-                foreach (var itemPara in item.AllOutputParameters)
-                {
-                    name = itemPara.Name;
-                    name = reg.IsMatch(name)?"name"+index:itemPara.Name;
-                    strs[index,0] = "ref";
-                    strs[index,1] = DbTypeCSharp[itemPara.DataType.ToString()];
-                    strs[index,2] = name.Replace("@","");
-                    strs[index,3] = itemPara.NativeType.ToString();
-                    index++;
-                }
+            public static int <%=item.Name %>(<%=paras %>){
+                Sql.Reset();
+                <%
                 for (int i = 0; i < strs.GetLength(0); i++)
                 {
-                    paras += strs[i,0]+" "+strs[i,1]+" "+strs[i,2]+",";
-                }
-                paras = paras.Trim(',');
+                    if(strs[i,0]==""){
+                    %>
+                Sql.AddParameter(new SqlParameter("@<%=strs[i,2]%>",<%=strs[i,2]%>));
+                    <%
+                    }else if(strs[i,0]=="ref"){
                 %>
-        public static int <%=item.Name %>(<%=paras %>){
-            Sql.Reset();
-            <%
-            for (int i = 0; i < strs.GetLength(0); i++)
-            {
-                if(strs[i,0]==""){
-                %>
-            Sql.AddParameter(new SqlParameter("@<%=strs[i,2]%>",<%=strs[i,2]%>));
+                Sql.AddOutputParameter("@<%=strs[i,2] %>",SqlDbType.<%=SqlNativeSqlDb[strs[i,3]]%>,int.MaxValue);
                 <%
-                }else if(strs[i,0]=="ref"){
-            %>
-            Sql.AddOutputParameter("@<%=strs[i,2] %>",SqlDbType.<%=SqlNativeSqlDb[strs[i,3]]%>,int.MaxValue);
-            <%
-                }
-            }
-            %>
-            Sql.AddReturnValueParameter();
-            Sql.ExecuteSPReader("<%=item.Name%>");
-            <%for (int i = 0; i < strs.GetLength(0); i++)
-            {
-                if(strs[i,0]=="ref"){
-            %>
-            <%=strs[i,2] %> = (<%=strs[i,1]%>)Sql.Parameters["@<%=strs[i,2]%>"].Value;
-            <%}
-            } %>
-            Sql.Disconnect();
-            return Sql.ReturnValue;
-        }
-        
-        public static int <%=item.Name %>(<%=paras==""?"ref DataSet ds":"ref DataSet ds,"+paras %>){
-            Sql.Reset();
-            <%
-            for (int i = 0; i < strs.GetLength(0); i++)
-            {
-                if(strs[i,0]==""){
-                %>
-            Sql.AddParameter(new SqlParameter("@<%=strs[i,2]%>",<%=strs[i,2]%>));
-                <%
-                }else if(strs[i,0]=="ref"){
-            %>
-            Sql.AddOutputParameter("@<%=strs[i,2] %>",SqlDbType.<%=SqlNativeSqlDb[strs[i,3]]%>,int.MaxValue);
-            <%
-                }
-            }
-            %>
-            Sql.AddReturnValueParameter();
-            ds = Sql.ExecuteSPDataSet("<%=item.Name%>");
-            <%for (int i = 0; i < strs.GetLength(0); i++)
-            {
-                if(strs[i,0]=="ref"){
-            %>
-            <%=strs[i,2] %> = (<%=strs[i,1]%>)Sql.Parameters["@<%=strs[i,2]%>"].Value;
-            <%}
-            } %>
-            Sql.Disconnect();
-            return Sql.ReturnValue;
-        }
-        
-         <%} %>
-    }
-    #endregion
-        
-    #region models
-    public class Models{
-        <%foreach (var item in SourceDatabase.Tables)
-        {
-         %>
-         public class <%=item.Name %>Model{
-            <%foreach (var itemColumn in item.Columns)
-            {%>
-            <%=itemColumn.SystemType.Name +" _"+itemColumn.Name+";" %>
-            /// <summary>
-            /// <%--<%=itemColumn.Description %>--%>
-            /// </summary>
-            public <%=itemColumn.SystemType.Name +" "+itemColumn.Name+"" %>{ 
-                get{ return _<%=itemColumn.Name%>; } 
-                set{ _<%=itemColumn.Name%> = value;}
-            }
-            <%}%>
-         }
-         <%
-        } %>
-        
-        <%foreach (var item in SourceDatabase.Views)
-        {
-         %>
-         public class <%=item.Name %>Model{
-            <%foreach (var itemColumn in item.Columns)
-            {%>
-            <%=itemColumn.SystemType.Name +" _"+itemColumn.Name+";" %>
-            public <%=itemColumn.SystemType.Name +" "+itemColumn.Name+"" %>{ get{ return _<%=itemColumn.Name%>; } set{ _<%=itemColumn.Name%> = value;}}
-            <%}%>
-         }
-         <%
-        } %>
-        
-    }
-    #endregion
-    //[DebuggerStepThrough]
-    public class SqlService
-    {    
-        protected string _connectionString = String.Empty;
-        protected SqlParameterCollection _parameterCollection;
-        protected ArrayList _parameters = new ArrayList();
-        protected bool _isSingleRow = false;
-        protected bool _convertEmptyValuesToDbNull = true;
-        protected bool _convertMinValuesToDbNull = true;
-        protected bool _convertMaxValuesToDbNull = false;
-        protected bool _autoCloseConnection = true;
-        protected SqlConnection _connection;
-        protected SqlTransaction _transaction;
-        protected int _commandTimeout = 30;
-        public SqlService() {_connectionString = ConfigurationSettings.AppSettings["<%=ConnectionStringName %>"]; }
-        public SqlService(string connectionString) {_connectionString = connectionString; }
-        public SqlService(string server, string database, string user, string password) {this.ConnectionString = "Server=" + server + ";Database=" + database + ";User ID=" + user + ";Password=" + password + ";"; }
-        public SqlService(string server, string database) {this.ConnectionString = "Server=" + server + ";Database=" + database + ";Integrated Security=true;"; }
-        public SqlService(SqlConnection connection) {this.Connection = connection; this.AutoCloseConnection = false; } 
-        public string ConnectionString {get {return _connectionString; } set {_connectionString = value; } }
-        public int CommandTimeout {get {return _commandTimeout; } set {_commandTimeout = value; } }
-        public bool IsSingleRow {get {return _isSingleRow; } set {_isSingleRow = value; } }
-        public bool AutoCloseConnection {get {return _autoCloseConnection; } set {_autoCloseConnection = value; } }
-        public SqlConnection Connection {get {return _connection; } set {_connection = value; this.ConnectionString = _connection.ConnectionString; } }
-        public SqlTransaction Transaction {get {return _transaction; } set {_transaction = value; } }
-        public bool ConvertEmptyValuesToDbNull {get {return _convertEmptyValuesToDbNull; } set {_convertEmptyValuesToDbNull = value; } }
-        public bool ConvertMinValuesToDbNull {get {return _convertMinValuesToDbNull; } set {_convertMinValuesToDbNull = value; } }
-        public bool ConvertMaxValuesToDbNull {get {return _convertMaxValuesToDbNull; } set {_convertMaxValuesToDbNull = value; } }
-        public SqlParameterCollection Parameters {get {return _parameterCollection; } }
-        public int ReturnValue {get {if (_parameterCollection.Contains("@ReturnValue")) {return (int)_parameterCollection["@ReturnValue"].Value; } else {throw new Exception("You must call the AddReturnValueParameter method before executing your request."); } } } 
-        public void ExecuteSql(string sql)
-        {
-            SqlCommand cmd = new SqlCommand();
-            this.Connect();
-            cmd.CommandTimeout = this.CommandTimeout;
-            cmd.CommandText = sql;
-            cmd.Connection = _connection;
-            if (_transaction != null) cmd.Transaction = _transaction;
-            cmd.CommandType = CommandType.Text;
-            this.CopyParameters(cmd);
-            cmd.ExecuteNonQuery();
-            cmd.Dispose();
-            if (this.AutoCloseConnection) this.Disconnect();
-        }
-        public SqlDataReader ExecuteSqlReader(string sql)
-        {
-            SqlDataReader reader;
-            SqlCommand cmd = new SqlCommand();
-            this.Connect();
-            cmd.CommandTimeout = this.CommandTimeout;
-            cmd.CommandText = sql;
-            cmd.Connection = _connection;
-            if (_transaction != null) cmd.Transaction = _transaction;
-            cmd.CommandType = CommandType.Text;
-            this.CopyParameters(cmd);
-            CommandBehavior behavior = CommandBehavior.Default;
-            if (this.AutoCloseConnection) behavior = behavior | CommandBehavior.CloseConnection;
-            if (_isSingleRow) behavior = behavior | CommandBehavior.SingleRow;
-            reader = cmd.ExecuteReader(behavior);
-            cmd.Dispose();
-            return reader;
-        }
-        public XmlReader ExecuteSqlXmlReader(string sql)
-        {
-            XmlReader reader;
-            SqlCommand cmd = new SqlCommand();
-            this.Connect();
-            cmd.CommandTimeout = this.CommandTimeout;
-            cmd.CommandText = sql;
-            cmd.Connection = _connection;
-            if (_transaction != null) cmd.Transaction = _transaction;
-            cmd.CommandType = CommandType.Text;
-            this.CopyParameters(cmd);
-            reader = cmd.ExecuteXmlReader();
-            cmd.Dispose();
-            return reader;
-        }
-        public DataSet ExecuteSqlDataSet(string sql)
-        {
-            SqlCommand cmd = new SqlCommand();
-            this.Connect();
-            SqlDataAdapter da = new SqlDataAdapter();
-            DataSet ds = new DataSet();
-            cmd.CommandTimeout = this.CommandTimeout;
-            cmd.Connection = _connection;
-            if (_transaction != null) cmd.Transaction = _transaction;
-            cmd.CommandText = sql;
-            cmd.CommandType = CommandType.Text;
-            this.CopyParameters(cmd);
-            da.SelectCommand = cmd;
-            da.Fill(ds);
-            da.Dispose();
-            cmd.Dispose();
-            if (this.AutoCloseConnection) this.Disconnect();
-            return ds;
-        }
-        public DataSet ExecuteSqlDataSet(string sql, string tableName)
-        {
-            SqlCommand cmd = new SqlCommand();
-            this.Connect();
-            SqlDataAdapter da = new SqlDataAdapter();
-            DataSet ds = new DataSet();
-            cmd.CommandTimeout = this.CommandTimeout;
-            cmd.Connection = _connection;
-            if (_transaction != null) cmd.Transaction = _transaction;
-            cmd.CommandText = sql;
-            cmd.CommandType = CommandType.Text;
-            this.CopyParameters(cmd);
-            da.SelectCommand = cmd;
-            da.Fill(ds, tableName);
-            da.Dispose();
-            cmd.Dispose();
-            if (this.AutoCloseConnection) this.Disconnect();
-            return ds;
-        }
-        public void ExecuteSqlDataSet(ref DataSet dataSet, string sql, string tableName)
-        {
-            SqlCommand cmd = new SqlCommand();
-            this.Connect();
-            SqlDataAdapter da = new SqlDataAdapter();
-            cmd.CommandTimeout = this.CommandTimeout;
-            cmd.Connection = _connection;
-            if (_transaction != null) cmd.Transaction = _transaction;
-            cmd.CommandText = sql;
-            cmd.CommandType = CommandType.Text;
-            this.CopyParameters(cmd);
-            da.SelectCommand = cmd;
-            da.Fill(dataSet, tableName);
-            da.Dispose();
-            cmd.Dispose();
-            if (this.AutoCloseConnection) this.Disconnect();
-        }
-        public DataSet ExecuteSPDataSet(string procedureName)
-        {
-            SqlCommand cmd = new SqlCommand();
-            this.Connect();
-            SqlDataAdapter da = new SqlDataAdapter();
-            DataSet ds = new DataSet();
-            cmd.CommandTimeout = this.CommandTimeout;
-            cmd.CommandText = procedureName;
-            cmd.Connection = _connection;
-            if (_transaction != null) cmd.Transaction = _transaction;
-            cmd.CommandType = CommandType.StoredProcedure;
-            this.CopyParameters(cmd);
-            da.SelectCommand = cmd;
-            da.Fill(ds);
-            _parameterCollection = cmd.Parameters;
-            da.Dispose();
-            cmd.Dispose();
-            if (this.AutoCloseConnection) this.Disconnect();
-            return ds;
-        }
-        public DataSet ExecuteSPDataSet(string procedureName, string tableName)
-        {
-            SqlCommand cmd = new SqlCommand();
-            this.Connect();
-            SqlDataAdapter da = new SqlDataAdapter();
-            DataSet ds = new DataSet();
-            cmd.CommandTimeout = this.CommandTimeout;
-            cmd.CommandText = procedureName;
-            cmd.Connection = _connection;
-            if (_transaction != null) cmd.Transaction = _transaction;
-            cmd.CommandType = CommandType.StoredProcedure;
-            this.CopyParameters(cmd);
-            da.SelectCommand = cmd;
-            da.Fill(ds, tableName);
-            _parameterCollection = cmd.Parameters;
-            da.Dispose();
-            cmd.Dispose();
-            if (this.AutoCloseConnection) this.Disconnect();
-            return ds;
-        }
-        public void ExecuteSPDataSet(ref DataSet dataSet, string procedureName, string tableName)
-        {
-            SqlCommand cmd = new SqlCommand();
-            this.Connect();
-            SqlDataAdapter da = new SqlDataAdapter();
-            cmd.CommandTimeout = this.CommandTimeout;
-            cmd.CommandText = procedureName;
-            cmd.Connection = _connection;
-            if (_transaction != null) cmd.Transaction = _transaction;
-            cmd.CommandType = CommandType.StoredProcedure;
-            this.CopyParameters(cmd);
-            da.SelectCommand = cmd;
-            da.Fill(dataSet, tableName);
-            _parameterCollection = cmd.Parameters;
-            da.Dispose();
-            cmd.Dispose();
-            if (this.AutoCloseConnection) this.Disconnect();
-        }
-        public void ExecuteSP(string procedureName)
-        {
-            SqlCommand cmd = new SqlCommand();
-            this.Connect();
-            cmd.CommandTimeout = this.CommandTimeout;
-            cmd.CommandText = procedureName;
-            cmd.Connection = _connection;
-            if (_transaction != null) cmd.Transaction = _transaction;
-            cmd.CommandType = CommandType.StoredProcedure;
-            this.CopyParameters(cmd);
-            cmd.ExecuteNonQuery();
-            _parameterCollection = cmd.Parameters;
-            cmd.Dispose();
-            if (this.AutoCloseConnection) this.Disconnect();
-        }
-        public SqlDataReader ExecuteSPReader(string procedureName)
-        {
-            SqlDataReader reader;
-            SqlCommand cmd = new SqlCommand();
-            this.Connect();
-            cmd.CommandTimeout = this.CommandTimeout;
-            cmd.CommandText = procedureName;
-            cmd.Connection = _connection;
-            if (_transaction != null) cmd.Transaction = _transaction;
-            cmd.CommandType = CommandType.StoredProcedure;
-            this.CopyParameters(cmd);
-            CommandBehavior behavior = CommandBehavior.Default;
-            if (this.AutoCloseConnection) behavior = behavior | CommandBehavior.CloseConnection;
-            if (_isSingleRow) behavior = behavior | CommandBehavior.SingleRow;
-            reader = cmd.ExecuteReader(behavior);
-            _parameterCollection = cmd.Parameters;
-            cmd.Dispose();
-            return reader;
-        }
-        public XmlReader ExecuteSPXmlReader(string procedureName)
-        {
-            XmlReader reader;
-            SqlCommand cmd = new SqlCommand();
-            this.Connect();
-            cmd.CommandTimeout = this.CommandTimeout;
-            cmd.CommandText = procedureName;
-            cmd.Connection = _connection;
-            if (_transaction != null) cmd.Transaction = _transaction;
-            cmd.CommandType = CommandType.StoredProcedure;
-            this.CopyParameters(cmd);
-            reader = cmd.ExecuteXmlReader();
-            _parameterCollection = cmd.Parameters;
-            cmd.Dispose();
-            return reader;
-        }
-        public SqlParameter AddParameter(string name, SqlDbType type, object value)
-        {
-            SqlParameter prm = new SqlParameter();
-            prm.Direction = ParameterDirection.Input;
-            prm.ParameterName = name;
-            prm.SqlDbType = type;
-            prm.Value = this.PrepareSqlValue(value);
-            _parameters.Add(prm);
-            return prm;
-        }
-        public SqlParameter AddParameter(string name, SqlDbType type, object value, bool convertZeroToDBNull)
-        {
-            SqlParameter prm = new SqlParameter();
-            prm.Direction = ParameterDirection.Input;
-            prm.ParameterName = name;
-            prm.SqlDbType = type;
-            prm.Value = this.PrepareSqlValue(value, convertZeroToDBNull);
-            _parameters.Add(prm);
-            return prm;
-        }
-        public SqlParameter AddParameter(string name, DbType type, object value, bool convertZeroToDBNull)
-        {
-            SqlParameter prm = new SqlParameter();
-            prm.Direction = ParameterDirection.Input;
-            prm.ParameterName = name;
-            prm.DbType = type;
-            prm.Value = this.PrepareSqlValue(value, convertZeroToDBNull);
-            _parameters.Add(prm);
-            return prm;
-        }
-        public SqlParameter AddParameter(string name, SqlDbType type, object value, int size)
-        {
-            SqlParameter prm = new SqlParameter();
-            prm.Direction = ParameterDirection.Input;
-            prm.ParameterName = name;
-            prm.SqlDbType = type;
-            prm.Size = size;
-            prm.Value = this.PrepareSqlValue(value);
-            _parameters.Add(prm);
-            return prm;
-        }
-        public SqlParameter AddParameter(string name, SqlDbType type, object value, ParameterDirection direction)
-        {
-            SqlParameter prm = new SqlParameter();
-            prm.Direction = direction;
-            prm.ParameterName = name;
-            prm.SqlDbType = type;
-            prm.Value = this.PrepareSqlValue(value);
-            _parameters.Add(prm);
-            return prm;
-        }
-        public SqlParameter AddParameter(string name, SqlDbType type, object value, int size, ParameterDirection direction)
-        {
-            SqlParameter prm = new SqlParameter();
-            prm.Direction = direction;
-            prm.ParameterName = name;
-            prm.SqlDbType = type;
-            prm.Size = size;
-            prm.Value = this.PrepareSqlValue(value);
-            _parameters.Add(prm);
-            return prm;
-        }
-        public void AddParameter(SqlParameter parameter)
-        {
-            _parameters.Add(parameter);
-        }
-        public SqlParameter AddOutputParameter(string name, SqlDbType type)
-        {
-            SqlParameter prm = new SqlParameter();
-            prm.Direction = ParameterDirection.Output;
-            prm.ParameterName = name;
-            prm.SqlDbType = type;
-            _parameters.Add(prm);
-            return prm;
-        }
-        public SqlParameter AddOutputParameter(string name, SqlDbType type, int size)
-        {
-            SqlParameter prm = new SqlParameter();
-            prm.Direction = ParameterDirection.Output;
-            prm.ParameterName = name;
-            prm.SqlDbType = type;
-            prm.Size = size;
-            _parameters.Add(prm);
-            return prm;
-        }
-        public SqlParameter AddReturnValueParameter()
-        {
-            SqlParameter prm = new SqlParameter();
-            prm.Direction = ParameterDirection.ReturnValue;
-            prm.ParameterName = "@ReturnValue";
-            prm.SqlDbType = SqlDbType.Int;
-            _parameters.Add(prm);
-            return prm;
-        }
-        public SqlParameter AddStreamParameter(string name, Stream value)
-        {
-            return this.AddStreamParameter(name, value, SqlDbType.Image);
-        }
-        public SqlParameter AddStreamParameter(string name, Stream value, SqlDbType type)
-        {
-            SqlParameter prm = new SqlParameter();
-            prm.Direction = ParameterDirection.Input;
-            prm.ParameterName = name;
-            prm.SqlDbType = type;
-            value.Position = 0;
-            byte[] data = new byte[value.Length];
-            value.Read(data, 0, (int)value.Length);
-            prm.Value = data;
-            _parameters.Add(prm);
-            return prm;
-        }
-        public SqlParameter AddTextParameter(string name, string value)
-        {
-            SqlParameter prm = new SqlParameter();
-            prm.Direction = ParameterDirection.Input;
-            prm.ParameterName = name;
-            prm.SqlDbType = SqlDbType.Text;
-            prm.Value = this.PrepareSqlValue(value);
-            _parameters.Add(prm);
-            return prm;
-        }
-        private void CopyParameters(SqlCommand command)
-        {
-            for (int i = 0; i < _parameters.Count; i++)
-            {
-                command.Parameters.Add(_parameters[i]);
-            }
-        }
-        private object PrepareSqlValue(object value)
-        {
-            return this.PrepareSqlValue(value, false);
-        }
-        private object PrepareSqlValue(object value, bool convertZeroToDBNull)
-        {
-            if (value is String)
-            {
-                if (this.ConvertEmptyValuesToDbNull && (string)value == String.Empty)
-                {
-                    return DBNull.Value;
-                }
-                else
-                {
-                    return value;
-                }
-            }
-            else if (value is Guid)
-            {
-                if (this.ConvertEmptyValuesToDbNull && (Guid)value == Guid.Empty)
-                {
-                    return DBNull.Value;
-                }
-                else
-                {
-                    return value;
-                }
-            }
-            else if (value is DateTime)
-            {
-                if ((this.ConvertMinValuesToDbNull && (DateTime)value == DateTime.MinValue)
-                    || (this.ConvertMaxValuesToDbNull && (DateTime)value == DateTime.MaxValue))
-                {
-                    return DBNull.Value;
-                }
-                else
-                {
-                    return value;
-                }
-            }
-            else if (value is Int16)
-            {
-                if ((this.ConvertMinValuesToDbNull && (Int16)value == Int16.MinValue)
-                    || (this.ConvertMaxValuesToDbNull && (Int16)value == Int16.MaxValue)
-                    || (convertZeroToDBNull && (Int16)value == 0))
-                {
-                    return DBNull.Value;
-                }
-                else
-                {
-                    return value;
-                }
-            }
-            else if (value is Int32)
-            {
-                if ((this.ConvertMinValuesToDbNull && (Int32)value == Int32.MinValue)
-                    || (this.ConvertMaxValuesToDbNull && (Int32)value == Int32.MaxValue)
-                    || (convertZeroToDBNull && (Int32)value == 0))
-                {
-                    return DBNull.Value;
-                }
-                else
-                {
-                    return value;
-                }
-            }
-            else if (value is Int64)
-            {
-                if ((this.ConvertMinValuesToDbNull && (Int64)value == Int64.MinValue)
-                    || (this.ConvertMaxValuesToDbNull && (Int64)value == Int64.MaxValue)
-                    || (convertZeroToDBNull && (Int64)value == 0))
-                {
-                    return DBNull.Value;
-                }
-                else
-                {
-                    return value;
-                }
-            }
-            else if (value is Single)
-            {
-                if ((this.ConvertMinValuesToDbNull && (Single)value == Single.MinValue)
-                    || (this.ConvertMaxValuesToDbNull && (Single)value == Single.MaxValue)
-                    || (convertZeroToDBNull && (Single)value == 0))
-                {
-                    return DBNull.Value;
-                }
-                else
-                {
-                    return value;
-                }
-            }
-            else if (value is Double)
-            {
-                if ((this.ConvertMinValuesToDbNull && (Double)value == Double.MinValue)
-                    || (this.ConvertMaxValuesToDbNull && (Double)value == Double.MaxValue)
-                    || (convertZeroToDBNull && (Double)value == 0))
-                {
-                    return DBNull.Value;
-                }
-                else
-                {
-                    return value;
-                }
-            }
-            else if (value is Decimal)
-            {
-                if ((this.ConvertMinValuesToDbNull && (Decimal)value == Decimal.MinValue)
-                    || (this.ConvertMaxValuesToDbNull && (Decimal)value == Decimal.MaxValue)
-                    || (convertZeroToDBNull && (Decimal)value == 0))
-                {
-                    return DBNull.Value;
-                }
-                else
-                {
-                    return value;
-                }
-            }
-            else
-            {
-                return value;
-            }
-        }
-        private Hashtable ParseConfigString(string config)
-        {
-            Hashtable attributes = new Hashtable(10, new CaseInsensitiveHashCodeProvider(CultureInfo.InvariantCulture), new CaseInsensitiveComparer(CultureInfo.InvariantCulture));
-            string[] keyValuePairs = config.Split(';');
-            for (int i = 0; i < keyValuePairs.Length; i++)
-            {
-                string[] keyValuePair = keyValuePairs[i].Split('=');
-                if (keyValuePair.Length == 2)
-                {
-                    attributes.Add(keyValuePair[0].Trim(), keyValuePair[1].Trim());
-                }
-                else
-                {
-                    attributes.Add(keyValuePairs[i].Trim(), null);
-                }
-            }
-            return attributes;
-        }
-        public void Connect()
-        {
-            if (_connection != null)
-            {
-                if (_connection.State != ConnectionState.Open)
-                {
-                    _connection.Open();
-                }
-            }
-            else
-            {
-                if (_connectionString != String.Empty)
-                {
-                    StringCollection initKeys = new StringCollection();
-                    initKeys.AddRange(new string[] { "ARITHABORT", "ANSI_NULLS", "ANSI_WARNINGS", "ARITHIGNORE", "ANSI_DEFAULTS", "ANSI_NULL_DFLT_OFF", "ANSI_NULL_DFLT_ON", "ANSI_PADDING", "ANSI_WARNINGS" });
-                    StringBuilder initStatements = new StringBuilder();
-                    StringBuilder connectionString = new StringBuilder();
-                    Hashtable attribs = this.ParseConfigString(_connectionString);
-                    foreach (string key in attribs.Keys)
-                    {
-                        if (initKeys.Contains(key.Trim().ToUpper()))
-                        {
-                            initStatements.AppendFormat("SET {0} {1};", key, attribs[key]);
-                        }
-                        else if (key.Trim().Length > 0)
-                        {
-                            connectionString.AppendFormat("{0}={1};", key, attribs[key]);
-                        }
                     }
-                    _connection = new SqlConnection(connectionString.ToString());
-                    _connection.Open();
-                    if (initStatements.Length > 0)
+                }
+                %>
+                Sql.AddReturnValueParameter();
+                Sql.ExecuteSPReader("<%=item.Name%>");
+                <%for (int i = 0; i < strs.GetLength(0); i++)
+                {
+                    if(strs[i,0]=="ref"){
+                %>
+                <%=strs[i,2] %> = (<%=strs[i,1]%>)Sql.Parameters["@<%=strs[i,2]%>"].Value;
+                <%}
+                } %>
+                Sql.Disconnect();
+                return Sql.ReturnValue;
+            }
+            
+            public static int <%=item.Name %>(<%=paras==""?"ref DataSet ds":"ref DataSet ds,"+paras %>){
+                Sql.Reset();
+                <%
+                for (int i = 0; i < strs.GetLength(0); i++)
+                {
+                    if(strs[i,0]==""){
+                    %>
+                Sql.AddParameter(new SqlParameter("@<%=strs[i,2]%>",<%=strs[i,2]%>));
+                    <%
+                    }else if(strs[i,0]=="ref"){
+                %>
+                Sql.AddOutputParameter("@<%=strs[i,2] %>",SqlDbType.<%=SqlNativeSqlDb[strs[i,3]]%>,int.MaxValue);
+                <%
+                    }
+                }
+                %>
+                Sql.AddReturnValueParameter();
+                ds = Sql.ExecuteSPDataSet("<%=item.Name%>");
+                <%for (int i = 0; i < strs.GetLength(0); i++)
+                {
+                    if(strs[i,0]=="ref"){
+                %>
+                <%=strs[i,2] %> = (<%=strs[i,1]%>)Sql.Parameters["@<%=strs[i,2]%>"].Value;
+                <%}
+                } %>
+                Sql.Disconnect();
+                return Sql.ReturnValue;
+            }
+            
+             <%} %>
+        }
+        #endregion
+            
+        #region models
+        public class Models{
+            <%foreach (var item in SourceDatabase.Tables)
+            {
+             %>
+             public class <%=item.Name %>Model{
+                <%foreach (var itemColumn in item.Columns)
+                {%>
+                <%=itemColumn.SystemType.Name +" _"+itemColumn.Name+";" %>
+                /// <summary>
+                /// <%--<%=itemColumn.Description %>--%>
+                /// </summary>
+                public <%=itemColumn.SystemType.Name +" "+itemColumn.Name+"" %>{ 
+                    get{ return _<%=itemColumn.Name%>; } 
+                    set{ _<%=itemColumn.Name%> = value;}
+                }
+                <%}%>
+             }
+             <%
+            } %>
+            
+            <%foreach (var item in SourceDatabase.Views)
+            {
+             %>
+             public class <%=item.Name %>Model{
+                <%foreach (var itemColumn in item.Columns)
+                {%>
+                <%=itemColumn.SystemType.Name +" _"+itemColumn.Name+";" %>
+                public <%=itemColumn.SystemType.Name +" "+itemColumn.Name+"" %>{ get{ return _<%=itemColumn.Name%>; } set{ _<%=itemColumn.Name%> = value;}}
+                <%}%>
+             }
+             <%
+            } %>
+            
+        }
+        #endregion
+        //[DebuggerStepThrough]
+        public class SqlService
+        {    
+            protected string _connectionString = String.Empty;
+            protected SqlParameterCollection _parameterCollection;
+            protected ArrayList _parameters = new ArrayList();
+            protected bool _isSingleRow = false;
+            protected bool _convertEmptyValuesToDbNull = true;
+            protected bool _convertMinValuesToDbNull = true;
+            protected bool _convertMaxValuesToDbNull = false;
+            protected bool _autoCloseConnection = true;
+            protected SqlConnection _connection;
+            protected SqlTransaction _transaction;
+            protected int _commandTimeout = 30;
+            public SqlService() {_connectionString = ConfigurationSettings.AppSettings["<%=ConnectionStringName %>"]; }
+            public SqlService(string connectionString) {_connectionString = connectionString; }
+            public SqlService(string server, string database, string user, string password) {this.ConnectionString = "Server=" + server + ";Database=" + database + ";User ID=" + user + ";Password=" + password + ";"; }
+            public SqlService(string server, string database) {this.ConnectionString = "Server=" + server + ";Database=" + database + ";Integrated Security=true;"; }
+            public SqlService(SqlConnection connection) {this.Connection = connection; this.AutoCloseConnection = false; } 
+            public string ConnectionString {get {return _connectionString; } set {_connectionString = value; } }
+            public int CommandTimeout {get {return _commandTimeout; } set {_commandTimeout = value; } }
+            public bool IsSingleRow {get {return _isSingleRow; } set {_isSingleRow = value; } }
+            public bool AutoCloseConnection {get {return _autoCloseConnection; } set {_autoCloseConnection = value; } }
+            public SqlConnection Connection {get {return _connection; } set {_connection = value; this.ConnectionString = _connection.ConnectionString; } }
+            public SqlTransaction Transaction {get {return _transaction; } set {_transaction = value; } }
+            public bool ConvertEmptyValuesToDbNull {get {return _convertEmptyValuesToDbNull; } set {_convertEmptyValuesToDbNull = value; } }
+            public bool ConvertMinValuesToDbNull {get {return _convertMinValuesToDbNull; } set {_convertMinValuesToDbNull = value; } }
+            public bool ConvertMaxValuesToDbNull {get {return _convertMaxValuesToDbNull; } set {_convertMaxValuesToDbNull = value; } }
+            public SqlParameterCollection Parameters {get {return _parameterCollection; } }
+            public int ReturnValue {get {if (_parameterCollection.Contains("@ReturnValue")) {return (int)_parameterCollection["@ReturnValue"].Value; } else {throw new Exception("You must call the AddReturnValueParameter method before executing your request."); } } } 
+            public void ExecuteSql(string sql)
+            {
+                SqlCommand cmd = new SqlCommand();
+                this.Connect();
+                cmd.CommandTimeout = this.CommandTimeout;
+                cmd.CommandText = sql;
+                cmd.Connection = _connection;
+                if (_transaction != null) cmd.Transaction = _transaction;
+                cmd.CommandType = CommandType.Text;
+                this.CopyParameters(cmd);
+                cmd.ExecuteNonQuery();
+                cmd.Dispose();
+                if (this.AutoCloseConnection) this.Disconnect();
+            }
+            public SqlDataReader ExecuteSqlReader(string sql)
+            {
+                SqlDataReader reader;
+                SqlCommand cmd = new SqlCommand();
+                this.Connect();
+                cmd.CommandTimeout = this.CommandTimeout;
+                cmd.CommandText = sql;
+                cmd.Connection = _connection;
+                if (_transaction != null) cmd.Transaction = _transaction;
+                cmd.CommandType = CommandType.Text;
+                this.CopyParameters(cmd);
+                CommandBehavior behavior = CommandBehavior.Default;
+                if (this.AutoCloseConnection) behavior = behavior | CommandBehavior.CloseConnection;
+                if (_isSingleRow) behavior = behavior | CommandBehavior.SingleRow;
+                reader = cmd.ExecuteReader(behavior);
+                cmd.Dispose();
+                return reader;
+            }
+            public XmlReader ExecuteSqlXmlReader(string sql)
+            {
+                XmlReader reader;
+                SqlCommand cmd = new SqlCommand();
+                this.Connect();
+                cmd.CommandTimeout = this.CommandTimeout;
+                cmd.CommandText = sql;
+                cmd.Connection = _connection;
+                if (_transaction != null) cmd.Transaction = _transaction;
+                cmd.CommandType = CommandType.Text;
+                this.CopyParameters(cmd);
+                reader = cmd.ExecuteXmlReader();
+                cmd.Dispose();
+                return reader;
+            }
+            public DataSet ExecuteSqlDataSet(string sql)
+            {
+                SqlCommand cmd = new SqlCommand();
+                this.Connect();
+                SqlDataAdapter da = new SqlDataAdapter();
+                DataSet ds = new DataSet();
+                cmd.CommandTimeout = this.CommandTimeout;
+                cmd.Connection = _connection;
+                if (_transaction != null) cmd.Transaction = _transaction;
+                cmd.CommandText = sql;
+                cmd.CommandType = CommandType.Text;
+                this.CopyParameters(cmd);
+                da.SelectCommand = cmd;
+                da.Fill(ds);
+                da.Dispose();
+                cmd.Dispose();
+                if (this.AutoCloseConnection) this.Disconnect();
+                return ds;
+            }
+            public DataSet ExecuteSqlDataSet(string sql, string tableName)
+            {
+                SqlCommand cmd = new SqlCommand();
+                this.Connect();
+                SqlDataAdapter da = new SqlDataAdapter();
+                DataSet ds = new DataSet();
+                cmd.CommandTimeout = this.CommandTimeout;
+                cmd.Connection = _connection;
+                if (_transaction != null) cmd.Transaction = _transaction;
+                cmd.CommandText = sql;
+                cmd.CommandType = CommandType.Text;
+                this.CopyParameters(cmd);
+                da.SelectCommand = cmd;
+                da.Fill(ds, tableName);
+                da.Dispose();
+                cmd.Dispose();
+                if (this.AutoCloseConnection) this.Disconnect();
+                return ds;
+            }
+            public void ExecuteSqlDataSet(ref DataSet dataSet, string sql, string tableName)
+            {
+                SqlCommand cmd = new SqlCommand();
+                this.Connect();
+                SqlDataAdapter da = new SqlDataAdapter();
+                cmd.CommandTimeout = this.CommandTimeout;
+                cmd.Connection = _connection;
+                if (_transaction != null) cmd.Transaction = _transaction;
+                cmd.CommandText = sql;
+                cmd.CommandType = CommandType.Text;
+                this.CopyParameters(cmd);
+                da.SelectCommand = cmd;
+                da.Fill(dataSet, tableName);
+                da.Dispose();
+                cmd.Dispose();
+                if (this.AutoCloseConnection) this.Disconnect();
+            }
+            public DataSet ExecuteSPDataSet(string procedureName)
+            {
+                SqlCommand cmd = new SqlCommand();
+                this.Connect();
+                SqlDataAdapter da = new SqlDataAdapter();
+                DataSet ds = new DataSet();
+                cmd.CommandTimeout = this.CommandTimeout;
+                cmd.CommandText = procedureName;
+                cmd.Connection = _connection;
+                if (_transaction != null) cmd.Transaction = _transaction;
+                cmd.CommandType = CommandType.StoredProcedure;
+                this.CopyParameters(cmd);
+                da.SelectCommand = cmd;
+                da.Fill(ds);
+                _parameterCollection = cmd.Parameters;
+                da.Dispose();
+                cmd.Dispose();
+                if (this.AutoCloseConnection) this.Disconnect();
+                return ds;
+            }
+            public DataSet ExecuteSPDataSet(string procedureName, string tableName)
+            {
+                SqlCommand cmd = new SqlCommand();
+                this.Connect();
+                SqlDataAdapter da = new SqlDataAdapter();
+                DataSet ds = new DataSet();
+                cmd.CommandTimeout = this.CommandTimeout;
+                cmd.CommandText = procedureName;
+                cmd.Connection = _connection;
+                if (_transaction != null) cmd.Transaction = _transaction;
+                cmd.CommandType = CommandType.StoredProcedure;
+                this.CopyParameters(cmd);
+                da.SelectCommand = cmd;
+                da.Fill(ds, tableName);
+                _parameterCollection = cmd.Parameters;
+                da.Dispose();
+                cmd.Dispose();
+                if (this.AutoCloseConnection) this.Disconnect();
+                return ds;
+            }
+            public void ExecuteSPDataSet(ref DataSet dataSet, string procedureName, string tableName)
+            {
+                SqlCommand cmd = new SqlCommand();
+                this.Connect();
+                SqlDataAdapter da = new SqlDataAdapter();
+                cmd.CommandTimeout = this.CommandTimeout;
+                cmd.CommandText = procedureName;
+                cmd.Connection = _connection;
+                if (_transaction != null) cmd.Transaction = _transaction;
+                cmd.CommandType = CommandType.StoredProcedure;
+                this.CopyParameters(cmd);
+                da.SelectCommand = cmd;
+                da.Fill(dataSet, tableName);
+                _parameterCollection = cmd.Parameters;
+                da.Dispose();
+                cmd.Dispose();
+                if (this.AutoCloseConnection) this.Disconnect();
+            }
+            public void ExecuteSP(string procedureName)
+            {
+                SqlCommand cmd = new SqlCommand();
+                this.Connect();
+                cmd.CommandTimeout = this.CommandTimeout;
+                cmd.CommandText = procedureName;
+                cmd.Connection = _connection;
+                if (_transaction != null) cmd.Transaction = _transaction;
+                cmd.CommandType = CommandType.StoredProcedure;
+                this.CopyParameters(cmd);
+                cmd.ExecuteNonQuery();
+                _parameterCollection = cmd.Parameters;
+                cmd.Dispose();
+                if (this.AutoCloseConnection) this.Disconnect();
+            }
+            public SqlDataReader ExecuteSPReader(string procedureName)
+            {
+                SqlDataReader reader;
+                SqlCommand cmd = new SqlCommand();
+                this.Connect();
+                cmd.CommandTimeout = this.CommandTimeout;
+                cmd.CommandText = procedureName;
+                cmd.Connection = _connection;
+                if (_transaction != null) cmd.Transaction = _transaction;
+                cmd.CommandType = CommandType.StoredProcedure;
+                this.CopyParameters(cmd);
+                CommandBehavior behavior = CommandBehavior.Default;
+                if (this.AutoCloseConnection) behavior = behavior | CommandBehavior.CloseConnection;
+                if (_isSingleRow) behavior = behavior | CommandBehavior.SingleRow;
+                reader = cmd.ExecuteReader(behavior);
+                _parameterCollection = cmd.Parameters;
+                cmd.Dispose();
+                return reader;
+            }
+            public XmlReader ExecuteSPXmlReader(string procedureName)
+            {
+                XmlReader reader;
+                SqlCommand cmd = new SqlCommand();
+                this.Connect();
+                cmd.CommandTimeout = this.CommandTimeout;
+                cmd.CommandText = procedureName;
+                cmd.Connection = _connection;
+                if (_transaction != null) cmd.Transaction = _transaction;
+                cmd.CommandType = CommandType.StoredProcedure;
+                this.CopyParameters(cmd);
+                reader = cmd.ExecuteXmlReader();
+                _parameterCollection = cmd.Parameters;
+                cmd.Dispose();
+                return reader;
+            }
+            public SqlParameter AddParameter(string name, SqlDbType type, object value)
+            {
+                SqlParameter prm = new SqlParameter();
+                prm.Direction = ParameterDirection.Input;
+                prm.ParameterName = name;
+                prm.SqlDbType = type;
+                prm.Value = this.PrepareSqlValue(value);
+                _parameters.Add(prm);
+                return prm;
+            }
+            public SqlParameter AddParameter(string name, SqlDbType type, object value, bool convertZeroToDBNull)
+            {
+                SqlParameter prm = new SqlParameter();
+                prm.Direction = ParameterDirection.Input;
+                prm.ParameterName = name;
+                prm.SqlDbType = type;
+                prm.Value = this.PrepareSqlValue(value, convertZeroToDBNull);
+                _parameters.Add(prm);
+                return prm;
+            }
+            public SqlParameter AddParameter(string name, DbType type, object value, bool convertZeroToDBNull)
+            {
+                SqlParameter prm = new SqlParameter();
+                prm.Direction = ParameterDirection.Input;
+                prm.ParameterName = name;
+                prm.DbType = type;
+                prm.Value = this.PrepareSqlValue(value, convertZeroToDBNull);
+                _parameters.Add(prm);
+                return prm;
+            }
+            public SqlParameter AddParameter(string name, SqlDbType type, object value, int size)
+            {
+                SqlParameter prm = new SqlParameter();
+                prm.Direction = ParameterDirection.Input;
+                prm.ParameterName = name;
+                prm.SqlDbType = type;
+                prm.Size = size;
+                prm.Value = this.PrepareSqlValue(value);
+                _parameters.Add(prm);
+                return prm;
+            }
+            public SqlParameter AddParameter(string name, SqlDbType type, object value, ParameterDirection direction)
+            {
+                SqlParameter prm = new SqlParameter();
+                prm.Direction = direction;
+                prm.ParameterName = name;
+                prm.SqlDbType = type;
+                prm.Value = this.PrepareSqlValue(value);
+                _parameters.Add(prm);
+                return prm;
+            }
+            public SqlParameter AddParameter(string name, SqlDbType type, object value, int size, ParameterDirection direction)
+            {
+                SqlParameter prm = new SqlParameter();
+                prm.Direction = direction;
+                prm.ParameterName = name;
+                prm.SqlDbType = type;
+                prm.Size = size;
+                prm.Value = this.PrepareSqlValue(value);
+                _parameters.Add(prm);
+                return prm;
+            }
+            public void AddParameter(SqlParameter parameter)
+            {
+                _parameters.Add(parameter);
+            }
+            public SqlParameter AddOutputParameter(string name, SqlDbType type)
+            {
+                SqlParameter prm = new SqlParameter();
+                prm.Direction = ParameterDirection.Output;
+                prm.ParameterName = name;
+                prm.SqlDbType = type;
+                _parameters.Add(prm);
+                return prm;
+            }
+            public SqlParameter AddOutputParameter(string name, SqlDbType type, int size)
+            {
+                SqlParameter prm = new SqlParameter();
+                prm.Direction = ParameterDirection.Output;
+                prm.ParameterName = name;
+                prm.SqlDbType = type;
+                prm.Size = size;
+                _parameters.Add(prm);
+                return prm;
+            }
+            public SqlParameter AddReturnValueParameter()
+            {
+                SqlParameter prm = new SqlParameter();
+                prm.Direction = ParameterDirection.ReturnValue;
+                prm.ParameterName = "@ReturnValue";
+                prm.SqlDbType = SqlDbType.Int;
+                _parameters.Add(prm);
+                return prm;
+            }
+            public SqlParameter AddStreamParameter(string name, Stream value)
+            {
+                return this.AddStreamParameter(name, value, SqlDbType.Image);
+            }
+            public SqlParameter AddStreamParameter(string name, Stream value, SqlDbType type)
+            {
+                SqlParameter prm = new SqlParameter();
+                prm.Direction = ParameterDirection.Input;
+                prm.ParameterName = name;
+                prm.SqlDbType = type;
+                value.Position = 0;
+                byte[] data = new byte[value.Length];
+                value.Read(data, 0, (int)value.Length);
+                prm.Value = data;
+                _parameters.Add(prm);
+                return prm;
+            }
+            public SqlParameter AddTextParameter(string name, string value)
+            {
+                SqlParameter prm = new SqlParameter();
+                prm.Direction = ParameterDirection.Input;
+                prm.ParameterName = name;
+                prm.SqlDbType = SqlDbType.Text;
+                prm.Value = this.PrepareSqlValue(value);
+                _parameters.Add(prm);
+                return prm;
+            }
+            private void CopyParameters(SqlCommand command)
+            {
+                for (int i = 0; i < _parameters.Count; i++)
+                {
+                    command.Parameters.Add(_parameters[i]);
+                }
+            }
+            private object PrepareSqlValue(object value)
+            {
+                return this.PrepareSqlValue(value, false);
+            }
+            private object PrepareSqlValue(object value, bool convertZeroToDBNull)
+            {
+                if (value is String)
+                {
+                    if (this.ConvertEmptyValuesToDbNull && (string)value == String.Empty)
                     {
-                        SqlCommand cmd = new SqlCommand();
-                        cmd.CommandTimeout = this.CommandTimeout;
-                        cmd.CommandText = initStatements.ToString();
-                        cmd.Connection = _connection;
-                        cmd.CommandType = CommandType.Text;
-                        cmd.ExecuteNonQuery();
-                        cmd.Dispose();
+                        return DBNull.Value;
+                    }
+                    else
+                    {
+                        return value;
+                    }
+                }
+                else if (value is Guid)
+                {
+                    if (this.ConvertEmptyValuesToDbNull && (Guid)value == Guid.Empty)
+                    {
+                        return DBNull.Value;
+                    }
+                    else
+                    {
+                        return value;
+                    }
+                }
+                else if (value is DateTime)
+                {
+                    if ((this.ConvertMinValuesToDbNull && (DateTime)value == DateTime.MinValue)
+                        || (this.ConvertMaxValuesToDbNull && (DateTime)value == DateTime.MaxValue))
+                    {
+                        return DBNull.Value;
+                    }
+                    else
+                    {
+                        return value;
+                    }
+                }
+                else if (value is Int16)
+                {
+                    if ((this.ConvertMinValuesToDbNull && (Int16)value == Int16.MinValue)
+                        || (this.ConvertMaxValuesToDbNull && (Int16)value == Int16.MaxValue)
+                        || (convertZeroToDBNull && (Int16)value == 0))
+                    {
+                        return DBNull.Value;
+                    }
+                    else
+                    {
+                        return value;
+                    }
+                }
+                else if (value is Int32)
+                {
+                    if ((this.ConvertMinValuesToDbNull && (Int32)value == Int32.MinValue)
+                        || (this.ConvertMaxValuesToDbNull && (Int32)value == Int32.MaxValue)
+                        || (convertZeroToDBNull && (Int32)value == 0))
+                    {
+                        return DBNull.Value;
+                    }
+                    else
+                    {
+                        return value;
+                    }
+                }
+                else if (value is Int64)
+                {
+                    if ((this.ConvertMinValuesToDbNull && (Int64)value == Int64.MinValue)
+                        || (this.ConvertMaxValuesToDbNull && (Int64)value == Int64.MaxValue)
+                        || (convertZeroToDBNull && (Int64)value == 0))
+                    {
+                        return DBNull.Value;
+                    }
+                    else
+                    {
+                        return value;
+                    }
+                }
+                else if (value is Single)
+                {
+                    if ((this.ConvertMinValuesToDbNull && (Single)value == Single.MinValue)
+                        || (this.ConvertMaxValuesToDbNull && (Single)value == Single.MaxValue)
+                        || (convertZeroToDBNull && (Single)value == 0))
+                    {
+                        return DBNull.Value;
+                    }
+                    else
+                    {
+                        return value;
+                    }
+                }
+                else if (value is Double)
+                {
+                    if ((this.ConvertMinValuesToDbNull && (Double)value == Double.MinValue)
+                        || (this.ConvertMaxValuesToDbNull && (Double)value == Double.MaxValue)
+                        || (convertZeroToDBNull && (Double)value == 0))
+                    {
+                        return DBNull.Value;
+                    }
+                    else
+                    {
+                        return value;
+                    }
+                }
+                else if (value is Decimal)
+                {
+                    if ((this.ConvertMinValuesToDbNull && (Decimal)value == Decimal.MinValue)
+                        || (this.ConvertMaxValuesToDbNull && (Decimal)value == Decimal.MaxValue)
+                        || (convertZeroToDBNull && (Decimal)value == 0))
+                    {
+                        return DBNull.Value;
+                    }
+                    else
+                    {
+                        return value;
                     }
                 }
                 else
                 {
-                    throw new InvalidOperationException("You must set a connection object or specify a connection string before calling Connect.");
+                    return value;
                 }
             }
+            private Hashtable ParseConfigString(string config)
+            {
+                Hashtable attributes = new Hashtable(10, new CaseInsensitiveHashCodeProvider(CultureInfo.InvariantCulture), new CaseInsensitiveComparer(CultureInfo.InvariantCulture));
+                string[] keyValuePairs = config.Split(';');
+                for (int i = 0; i < keyValuePairs.Length; i++)
+                {
+                    string[] keyValuePair = keyValuePairs[i].Split('=');
+                    if (keyValuePair.Length == 2)
+                    {
+                        attributes.Add(keyValuePair[0].Trim(), keyValuePair[1].Trim());
+                    }
+                    else
+                    {
+                        attributes.Add(keyValuePairs[i].Trim(), null);
+                    }
+                }
+                return attributes;
+            }
+            public void Connect()
+            {
+                if (_connection != null)
+                {
+                    if (_connection.State != ConnectionState.Open)
+                    {
+                        _connection.Open();
+                    }
+                }
+                else
+                {
+                    if (_connectionString != String.Empty)
+                    {
+                        StringCollection initKeys = new StringCollection();
+                        initKeys.AddRange(new string[] { "ARITHABORT", "ANSI_NULLS", "ANSI_WARNINGS", "ARITHIGNORE", "ANSI_DEFAULTS", "ANSI_NULL_DFLT_OFF", "ANSI_NULL_DFLT_ON", "ANSI_PADDING", "ANSI_WARNINGS" });
+                        StringBuilder initStatements = new StringBuilder();
+                        StringBuilder connectionString = new StringBuilder();
+                        Hashtable attribs = this.ParseConfigString(_connectionString);
+                        foreach (string key in attribs.Keys)
+                        {
+                            if (initKeys.Contains(key.Trim().ToUpper()))
+                            {
+                                initStatements.AppendFormat("SET {0} {1};", key, attribs[key]);
+                            }
+                            else if (key.Trim().Length > 0)
+                            {
+                                connectionString.AppendFormat("{0}={1};", key, attribs[key]);
+                            }
+                        }
+                        _connection = new SqlConnection(connectionString.ToString());
+                        _connection.Open();
+                        if (initStatements.Length > 0)
+                        {
+                            SqlCommand cmd = new SqlCommand();
+                            cmd.CommandTimeout = this.CommandTimeout;
+                            cmd.CommandText = initStatements.ToString();
+                            cmd.Connection = _connection;
+                            cmd.CommandType = CommandType.Text;
+                            cmd.ExecuteNonQuery();
+                            cmd.Dispose();
+                        }
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("You must set a connection object or specify a connection string before calling Connect.");
+                    }
+                }
+            }
+            public void Disconnect() {if ((_connection != null) && (_connection.State != ConnectionState.Closed)) {_connection.Close(); } if (_connection != null) _connection.Dispose(); if (_transaction != null) _transaction.Dispose(); _transaction = null; _connection = null; }
+            public void BeginTransaction() {if (_connection != null) {_transaction = _connection.BeginTransaction(); } else {throw new InvalidOperationException("You must have a valid connection object before calling BeginTransaction."); } }
+            public void CommitTransaction() {if (_transaction != null) {try {_transaction.Commit(); } catch (Exception) {throw; } } else {throw new InvalidOperationException("You must call BeginTransaction before calling CommitTransaction."); } }
+            public void RollbackTransaction() {if (_transaction != null) {try {_transaction.Rollback(); } catch (Exception) {throw; } } else {throw new InvalidOperationException("You must call BeginTransaction before calling RollbackTransaction."); } }
+            public void Reset() {if (_parameters != null) {_parameters.Clear(); } if (_parameterCollection != null) {_parameterCollection = null; } }
         }
-        public void Disconnect() {if ((_connection != null) && (_connection.State != ConnectionState.Closed)) {_connection.Close(); } if (_connection != null) _connection.Dispose(); if (_transaction != null) _transaction.Dispose(); _transaction = null; _connection = null; }
-        public void BeginTransaction() {if (_connection != null) {_transaction = _connection.BeginTransaction(); } else {throw new InvalidOperationException("You must have a valid connection object before calling BeginTransaction."); } }
-        public void CommitTransaction() {if (_transaction != null) {try {_transaction.Commit(); } catch (Exception) {throw; } } else {throw new InvalidOperationException("You must call BeginTransaction before calling CommitTransaction."); } }
-        public void RollbackTransaction() {if (_transaction != null) {try {_transaction.Rollback(); } catch (Exception) {throw; } } else {throw new InvalidOperationException("You must call BeginTransaction before calling RollbackTransaction."); } }
-        public void Reset() {if (_parameters != null) {_parameters.Clear(); } if (_parameterCollection != null) {_parameterCollection = null; } }
     }
 }
