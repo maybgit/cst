@@ -152,7 +152,7 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                     }%>
                     base.Insert();
                 }
-                public void Select(string columns = "", string where = "", string orderBy = ""){base.Select(columns,where,orderBy,ReadModel);}
+                public <%=item.Name%> Select(string columns = "", string where = "", string orderBy = ""){base.Select(columns,where,orderBy,ReadModel);return this;}
             }
             <%
             }%>
@@ -179,7 +179,7 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                     } %>
                     return Model;
                 }
-                public void Select(string columns = "", string where = "", string orderBy = ""){base.Select(columns,where,orderBy,ReadModel);}
+                public <%=item.Name%> Select(string columns = "", string where = "", string orderBy = ""){base.Select(columns,where,orderBy,ReadModel);return this;}
             }
                 <%
                 } %>
