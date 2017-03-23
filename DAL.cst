@@ -135,7 +135,7 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
              
                 public new void Insert()
                 {
-                    StringBuilder queryParameters = new StringBuilder();
+                    queryParameters = new StringBuilder();
                    <%
                     isFirst = true;
                     foreach(var itemColumn in item.Columns){
