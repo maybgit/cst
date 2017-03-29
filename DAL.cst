@@ -97,7 +97,7 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                 string idName = null;
             %>
             public class <%=item.Name%>: BaseTable<Models.<%=item.Name%>Model>{
-                public <%=item.Name %>():base("<%=item.Name %>"){Model=new Models.<%=item.Name%>Model();}
+                public <%=item.Name %>(bool isInitModel=false):base("<%=item.Name %>"){ if(isInitModel) Model=new Models.<%=item.Name%>Model();}
                 public <%= item.Name %>(int id):base(id,"<%=item.Name %>"){ ReadModels(reader,ReadModel);}
                 Models.<%=item.Name%>Model ReadModel(SqlDataReader reader)
                 {
