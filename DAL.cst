@@ -71,10 +71,11 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                 string sqlText = "delete from "+TableName+" where " + where;
                 Sql.ExecuteSql(sqlText);
             }
-            internal void Insert()
+            internal int Insert()
             {
-                string sqlText = String.Format("Insert Into "+TableName+"({0}) Values({1})", queryParameters.ToString().Replace("@", ""), queryParameters.ToString());
-                Sql.ExecuteSql(sqlText);
+                string sqlText = String.Format("Insert Into "+TableName+"({0}) Values({1}) select @@identity", queryParameters.ToString().Replace("@", ""), queryParameters.ToString());
+                try{return Convert.ToInt32(Sql.ExecuteSqlScalar(sqlText));}catch(Exception ex){throw ex;} return 0;
+                
             }
             internal void Select(string columns, string where, string orderBy, Func<SqlDataReader, T> fun)
             {
@@ -96,7 +97,7 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                 string idName = null;
             %>
             public class <%=item.Name%>: BaseTable<Models.<%=item.Name%>Model>{
-                public <%=item.Name %>():base("<%=item.Name %>"){}
+                public <%=item.Name %>():base("<%=item.Name %>"){Model=new Models.<%=item.Name%>Model();}
                 public <%= item.Name %>(int id):base(id,"<%=item.Name %>"){ ReadModels(reader,ReadModel);}
                 Models.<%=item.Name%>Model ReadModel(SqlDataReader reader)
                 {
@@ -133,7 +134,7 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                     base.Update();
                 }
              
-                public new void Insert()
+                public new int Insert()
                 {
                     queryParameters = new StringBuilder();
                    <%
@@ -150,7 +151,7 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                             isFirst = false;
                         }
                     }%>
-                    base.Insert();
+                    return base.Insert();
                 }
                 public <%=item.Name%> Select(string columns = "", string where = "", string orderBy = ""){base.Select(columns,where,orderBy,ReadModel);return this;}
             }
@@ -408,6 +409,21 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                 cmd.Dispose();
                 if (this.AutoCloseConnection) this.Disconnect();
             }
+            public object ExecuteSqlScalar(string sql)
+            {
+                SqlCommand cmd = new SqlCommand();
+                this.Connect();
+                cmd.CommandTimeout = this.CommandTimeout;
+                cmd.CommandText = sql;
+                cmd.Connection = _connection;
+                if (_transaction != null) cmd.Transaction = _transaction;
+                cmd.CommandType = CommandType.Text;
+                this.CopyParameters(cmd);
+                object obj = cmd.ExecuteScalar();
+                cmd.Dispose();
+                if (this.AutoCloseConnection) this.Disconnect();
+                return obj;
+            }            
             public SqlDataReader ExecuteSqlReader(string sql)
             {
                 SqlDataReader reader;
