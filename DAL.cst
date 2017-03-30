@@ -56,6 +56,7 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                 TableName = tableName;
                 Sql.AddParameter("@ID", SqlDbType.Int, id);
                 reader = Sql.ExecuteSqlReader("SELECT * FROM dbo."+TableName+" WHERE ID = @ID");
+                Sql.Reset();
             }
             protected void ReadModels(SqlDataReader reader,Func<SqlDataReader, T> fun)
             {
@@ -63,18 +64,18 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                 while (reader.Read()){Models.Add(fun(reader));}
                 if (!reader.IsClosed) reader.Close();
             }
-            internal void Update() {
-                string query = String.Format("Update {1} Set {0} Where ID = @ID", queryParameters.ToString(),TableName);
-                SqlDataReader reader = Sql.ExecuteSqlReader(query);
+            internal int Update() {
+                string query = String.Format("Update {1} Set {0} Where ID=@ID", queryParameters.ToString(),TableName);
+                return Sql.ExecuteSql(query);
             }
-            public void Delete(string where) {
+            public int Delete(string where) {
                 string sqlText = "delete from "+TableName+" where " + where;
-                Sql.ExecuteSql(sqlText);
+                return Sql.ExecuteSql(sqlText);
             }
             internal int Insert()
             {
                 string sqlText = String.Format("Insert Into "+TableName+"({0}) Values({1}) select @@identity", queryParameters.ToString().Replace("@", ""), queryParameters.ToString());
-                try{return Convert.ToInt32(Sql.ExecuteSqlScalar(sqlText));}catch(Exception ex){throw ex;} return 0;
+                try{return Convert.ToInt32(Sql.ExecuteSqlScalar(sqlText));}catch(Exception ex){throw ex;}
                 
             }
             internal void Select(string columns, string where, string orderBy, Func<SqlDataReader, T> fun)
@@ -113,7 +114,7 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                     return Model;
                 }
                 
-                public new void Update()
+                public new int Update()
                 {
                     queryParameters = new StringBuilder();
                    <%
@@ -131,7 +132,7 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                             isFirst = false;
                         }else id=itemColumn.Name;
                     }%>
-                    base.Update();
+                    return base.Update();
                 }
              
                 public new int Insert()
@@ -395,7 +396,7 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
             public bool ConvertMaxValuesToDbNull {get {return _convertMaxValuesToDbNull; } set {_convertMaxValuesToDbNull = value; } }
             public SqlParameterCollection Parameters {get {return _parameterCollection; } }
             public int ReturnValue {get {if (_parameterCollection.Contains("@ReturnValue")) {return (int)_parameterCollection["@ReturnValue"].Value; } else {throw new Exception("You must call the AddReturnValueParameter method before executing your request."); } } } 
-            public void ExecuteSql(string sql)
+            public int ExecuteSql(string sql)
             {
                 SqlCommand cmd = new SqlCommand();
                 this.Connect();
@@ -405,9 +406,10 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                 if (_transaction != null) cmd.Transaction = _transaction;
                 cmd.CommandType = CommandType.Text;
                 this.CopyParameters(cmd);
-                cmd.ExecuteNonQuery();
+                int result = cmd.ExecuteNonQuery();
                 cmd.Dispose();
                 if (this.AutoCloseConnection) this.Disconnect();
+                return result;
             }
             public object ExecuteSqlScalar(string sql)
             {
