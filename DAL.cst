@@ -43,6 +43,14 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
     public class DAL{
         public class BaseTable<T>
         {
+            string updateCommandText;
+            string insertCommandText;
+            string deleteCommandText;
+            string selectCommandText;
+            public string UpdateCommandText { get => updateCommandText ?? " Update " + TableName + " Set {0} Where ID=@ID "; set => updateCommandText = value; }
+            public string InsertCommandText { get => insertCommandText ?? " Insert Into " + TableName + "({0}) Values({1}) select @@identity "; set => insertCommandText = value; }
+            public string DeleteCommandText { get => deleteCommandText ?? " Delete from "+ TableName +" where {0} "; set => deleteCommandText = value; }
+            public string SelectCommandText { get => selectCommandText ?? " SELECT {0} FROM "+ TableName +" {1} {2} "; set => selectCommandText = value; }
             public T Model { get; set; }
             public List<T> Models { get; set; }
             public SqlService Sql = new SqlService();
@@ -51,7 +59,7 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
             internal string TableName;
             public BaseTable() {}
             public BaseTable(string tableName) { TableName = tableName; }
-            public BaseTable(int id, string tableName)
+            public BaseTable(long id, string tableName)
             {
                 TableName = tableName;
                 Sql.AddParameter("@ID", SqlDbType.Int, id);
@@ -65,27 +73,28 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                 if (!reader.IsClosed) reader.Close();
             }
             internal int Update() {
-                string query = String.Format("Update {1} Set {0} Where ID=@ID", queryParameters.ToString(),TableName);
-                return Sql.ExecuteSql(query);
+                UpdateCommandText = String.Format(UpdateCommandText, queryParameters.ToString());
+                return Sql.ExecuteSql(UpdateCommandText);
             }
             public int Delete(string where) {
-                string sqlText = "delete from "+TableName+" where " + where;
-                return Sql.ExecuteSql(sqlText);
+                DeleteCommandText = string.Format(DeleteCommandText,where);
+                return Sql.ExecuteSql(DeleteCommandText);
             }
             internal int Insert()
             {
-                string sqlText = String.Format("Insert Into "+TableName+"({0}) Values({1}) select @@identity", queryParameters.ToString().Replace("@", ""), queryParameters.ToString());
-                try{return Convert.ToInt32(Sql.ExecuteSqlScalar(sqlText));}catch(Exception ex){throw ex;}
-                
+                InsertCommandText = String.Format(InsertCommandText, queryParameters.ToString().Replace("@", ""), queryParameters.ToString());
+                try{return Convert.ToInt32(Sql.ExecuteSqlScalar(InsertCommandText));}catch(Exception ex){throw ex;}
             }
-            internal void Select(string columns, string where, string orderBy, Func<SqlDataReader, T> fun)
+            internal void Select(string where, int? top , Func<SqlDataReader, T> fun)
             {
-                reader = Sql.ExecuteSqlReader(string.Format("SELECT {0} FROM dbo.{3} {1} {2}", columns == "" ? "*" : columns, where == "" ? "" : " where " + where, orderBy == "" ? "" : " order by " + orderBy,TableName));
+                SelectCommandText = string.Format(SelectCommandText, top == null ? "*" : "top "+top+" *", string.IsNullOrEmpty(where) ? "" : " where " + where,"");
+                reader = Sql.ExecuteSqlReader(SelectCommandText);
                 ReadModels(reader, fun);
             }
-            public DataTable SelectToDataTable(string columns = "", string where = "", string orderBy = "")
+            public DataTable Select(string where, string columns, string orderBy)
             {
-                DataSet ds = Sql.ExecuteSqlDataSet(string.Format("SELECT {0} FROM dbo.{3} {1} {2}", columns == "" ? "*" : columns, where == "" ? "" : " where " + where, orderBy == "" ? "" : " order by " + orderBy,TableName));
+                SelectCommandText = string.Format(SelectCommandText, string.IsNullOrEmpty(columns) ? "*" : columns, string.IsNullOrEmpty(where) ? "" : " where " + where, string.IsNullOrEmpty(orderBy) ? "" : " order by " + orderBy);
+                DataSet ds = Sql.ExecuteSqlDataSet(SelectCommandText);
                 if (null != ds && ds.Tables.Count > 0) return ds.Tables[0];
                 return null;
             }
@@ -99,7 +108,7 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
             %>
             public class <%=item.Name%>: BaseTable<Models.<%=item.Name%>Model>{
                 public <%=item.Name %>(bool isInitModel=false):base("<%=item.Name %>"){ if(isInitModel) Model=new Models.<%=item.Name%>Model();}
-                public <%= item.Name %>(int id):base(id,"<%=item.Name %>"){ ReadModels(reader,ReadModel);}
+                public <%= item.Name %>(long id):base(id,"<%=item.Name %>"){ ReadModels(reader,ReadModel);}
                 Models.<%=item.Name%>Model ReadModel(SqlDataReader reader)
                 {
                     Model = new Models.<%=item.Name%>Model();
@@ -154,7 +163,7 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                     }%>
                     return base.Insert();
                 }
-                public <%=item.Name%> Select(string columns = "", string where = "", string orderBy = ""){base.Select(columns,where,orderBy,ReadModel);return this;}
+                public List<Models.<%=item.Name%>Model> Select(string where, int? top=null){base.Select(where,top,ReadModel);return Models;}
             }
             <%
             }%>
@@ -167,7 +176,7 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                 {%>
             public class <%=item.Name %>: BaseTable<Models.<%=item.Name%>Model>{
                 public <%=item.Name %>():base("<%=item.Name %>"){}
-                public <%= item.Name %>(int id):base(id,"<%=item.Name %>"){ ReadModels(reader,ReadModel);}
+                public <%= item.Name %>(long id):base(id,"<%=item.Name %>"){ ReadModels(reader,ReadModel);}
                 Models.<%=item.Name%>Model ReadModel(SqlDataReader reader)
                 {
                     Model = new Models.<%=item.Name%>Model();
@@ -181,7 +190,7 @@ namespace <%=string.IsNullOrEmpty(Namespace)?"Mayb":Namespace %>
                     } %>
                     return Model;
                 }
-                public <%=item.Name%> Select(string columns = "", string where = "", string orderBy = ""){base.Select(columns,where,orderBy,ReadModel);return this;}
+                public List<Models.<%=item.Name%>Model> Select(string where, int top=0){base.Select(where,top,ReadModel);return Models;}
             }
                 <%
                 } %>
