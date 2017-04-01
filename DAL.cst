@@ -109,7 +109,7 @@ namespace Mayb.DAL
                     } %>
                     return Model;
                 }
-                public List<Models.<%=item.Name%>Model> Select(string where=null, int top=0){base.Select(where,top,ReadModel);return Models;}
+                public List<Models.<%=item.Name%>Model> Select(string where=null, int? top=null){base.Select(where,top,ReadModel);return Models;}
             }
                 <%
                 } %>
@@ -294,12 +294,10 @@ namespace Mayb.DAL
             
         }
         #endregion
-        #region BaseTable.cs
+       
         <%=ReadFile("BaseTable.cs") %>
-        #endregion
-        #region BaseTable.cs
+    
         <%=ReadFile("SqlService.cs") %>
-        #endregion
     }
 
 <script runat="template">

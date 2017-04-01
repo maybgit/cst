@@ -26,8 +26,9 @@ namespace Mayb.DAL
                         updateCommandText += item.Key.TrimStart('@') + "=" + item.Key + ",";
                     }
                     updateCommandText = updateCommandText.TrimEnd(',');
+                    updateCommandText = " Update " + TableName + " Set " + updateCommandText + " Where ID=@ID ";
                 }
-                return " Update " + TableName + " Set " + updateCommandText + " Where ID=@ID ";
+                return updateCommandText;
             }
             set => updateCommandText = value;
         }
@@ -88,7 +89,6 @@ namespace Mayb.DAL
         {
             SetParametersValue();
             return Sql.ExecuteSql(UpdateCommandText);
-            return 0;
         }
         public int Delete(string where)
         {
@@ -108,7 +108,7 @@ namespace Mayb.DAL
         }
         public DataTable Select(string where, string columns, string orderBy)
         {
-            //SelectCommandText = string.Format(SelectCommandText, string.IsNullOrEmpty(columns) ? "*" : columns, string.IsNullOrEmpty(where) ? "" : " where " + where, string.IsNullOrEmpty(orderBy) ? "" : " order by " + orderBy);
+            SelectCommandText = string.Format(SelectCommandText, string.IsNullOrEmpty(columns) ? "*" : columns, string.IsNullOrEmpty(where) ? "" : " where " + where, string.IsNullOrEmpty(orderBy) ? "" : " order by " + orderBy);
             DataSet ds = Sql.ExecuteSqlDataSet(SelectCommandText);
             if (null != ds && ds.Tables.Count > 0) return ds.Tables[0];
             return null;
