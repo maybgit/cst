@@ -4,7 +4,6 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Mayb.DAL
 {
@@ -30,7 +29,7 @@ namespace Mayb.DAL
                 }
                 return updateCommandText;
             }
-            set => updateCommandText = value;
+            set { updateCommandText = value; }
         }
         public string InsertCommandText
         {
@@ -49,14 +48,14 @@ namespace Mayb.DAL
                 }
                 return insertCommandText;
             }
-            set => insertCommandText = value;
+            set { insertCommandText = value; }
         }
-        public string DeleteCommandText { get => deleteCommandText ?? " Delete from " + TableName + " where {0} "; set => deleteCommandText = value; }
-        public string SelectCommandText { get => selectCommandText ?? " SELECT {0} FROM " + TableName + " {1} {2} "; set => selectCommandText = value; }
+        public string DeleteCommandText { get { return deleteCommandText ?? " Delete from " + TableName + " where {0} "; } set { deleteCommandText = value; } }
+        public string SelectCommandText { get { return selectCommandText ?? " SELECT {0} FROM " + TableName + " {1} {2} "; } set { selectCommandText = value; } }
         public T Model { get; set; }
         public List<T> Models { get; set; }
         private Dictionary<string, SqlDbType> columns;
-        public Dictionary<string, SqlDbType> Columns { get => columns ?? (columns = new Dictionary<string, SqlDbType>()); set => columns = value; }
+        public Dictionary<string, SqlDbType> Columns { get { return columns ?? (columns = new Dictionary<string, SqlDbType>()); } set { columns = value; } }
         public SqlService Sql = new SqlService();
         internal SqlDataReader reader;
         internal string TableName;

@@ -56,10 +56,10 @@ namespace Mayb.DAL
                 }
                 return parameters;
             }
-            set => parameters = value;
+            set { parameters = value;}
         }
 
-        protected SqlCommand cmd { get => _cmd??(_cmd=new SqlCommand()); set => _cmd = value; }
+        protected SqlCommand cmd { get { return _cmd??(_cmd=new SqlCommand());} set { _cmd = value; } }
 
         private void CopyParameters(SqlCommand command)
         {

@@ -4,6 +4,8 @@
 <%@ Assembly Name="SchemaExplorer" %>
 <%@ Import Namespace="SchemaExplorer" %>
 <%@ Property Name="SourceDatabase" Type="SchemaExplorer.DatabaseSchema" IncludeFunctions="false" %>
+<%@ Property Name="ImportBaseTableFile" Type="Boolean" Default="true" Optional="True" %>
+<%@ Property Name="ImportSqlServiceFile" Type="Boolean" Default="true" Optional="True" %>
 <%@ Property Name="ConnectionStringName" Type="String" Default="ConnectionString" Optional="True" %>
 <%@ Import Namespace="System.Text" %>
 <%@ Import Namespace="System.Linq" %>
@@ -294,10 +296,16 @@ namespace Mayb.DAL
             
         }
         #endregion
-       
-        <%=ReadFile("BaseTable.cs") %>
-    
-        <%=ReadFile("SqlService.cs") %>
+       <% if(ImportBaseTableFile){
+           %>
+           <%=ReadFile("BaseTable.cs") %>
+           <%
+       } %>
+        <% if(ImportSqlServiceFile){
+           %>
+           <%=ReadFile("SqlService.cs") %>
+           <%
+       } %>
     }
 
 <script runat="template">
