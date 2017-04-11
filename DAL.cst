@@ -35,6 +35,7 @@ using System.Collections.Generic;
 /*
  * file read only
  * author：mayb
+ * https://github.com/maybgithub/CodeSmithTemplates
  */
 namespace Mayb.DAL
 {
