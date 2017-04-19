@@ -32,10 +32,11 @@ using System.Text;
 using System.Globalization;
 using System.Collections.Specialized;
 using System.Collections.Generic;
-/*
+/* 
  * file read only
  * author：mayb
  * https://github.com/maybgithub/CodeSmithTemplates
+ * <%=DateTime.Now %>
  */
 namespace Mayb.DAL
 {

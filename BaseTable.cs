@@ -76,12 +76,15 @@ namespace Mayb.DAL
         }
         void SetParametersValue()
         {
-            System.Reflection.PropertyInfo[] pis = Model.GetType().GetProperties();
-            string key;
-            foreach (var item in pis)
+            if (Model != null)
             {
-                key = "@" + item.Name;
-                Sql.AddParameter(key, columns[key], Sql.PrepareSqlValue(item.GetValue(Model, null)));
+                System.Reflection.PropertyInfo[] pis = Model.GetType().GetProperties();
+                string key;
+                foreach (var item in pis)
+                {
+                    key = "@" + item.Name;
+                    Sql.AddParameter(key, columns[key], Sql.PrepareSqlValue(item.GetValue(Model, null)));
+                }
             }
         }
         public int Update()
