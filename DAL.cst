@@ -36,6 +36,10 @@ using System.Collections.Generic;
  * file read only
  * author：mayb
  * https://github.com/maybgithub/CodeSmithTemplates
+ * add to web.config/app.config
+ *   <appSettings>
+ *       <add key="ConnectionString" value="server=.;uid=sa;Pwd=sa;Database=DBName" />
+ *  </appSettings>
  * <%=DateTime.Now %>
  */
 namespace Mayb.DAL
