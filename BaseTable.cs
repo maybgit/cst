@@ -59,9 +59,22 @@ namespace Mayb.DAL
         private Dictionary<string, SqlDbType> columns;
         public Dictionary<string, SqlDbType> Columns { get { return columns ?? (columns = new Dictionary<string, SqlDbType>()); } set { columns = value; } }
 
-        public SqlService Sql = new SqlService();
+        //public SqlService Sql = new SqlService();
+        SqlService sql;
+        public SqlService Sql
+        {
+            get
+            {
+                return sql ?? (sql = new SqlService());
+            }
+
+            set
+            {
+                sql = value;
+            }
+        }
         protected SqlDataReader reader;
-        protected string TableName; 
+        protected string TableName;
         int recordCount;
         public int RecordCount
         {
@@ -75,6 +88,7 @@ namespace Mayb.DAL
                 recordCount = value;
             }
         }
+
         #endregion
         public BaseTable() { }
         public BaseTable(string tableName) { TableName = tableName; }
@@ -141,7 +155,7 @@ namespace Mayb.DAL
             {
                 int endIndex = pageIndex * pageSize;
                 int startIndex = endIndex - pageSize + 1;
-                DAL.Procedures.P_Pager(ref ds,TableName, fields, where, orderField, startIndex, endIndex, ref recordCount);
+                DAL.Procedures.P_Pager(ref ds, TableName, fields, where, orderField, startIndex, endIndex, ref recordCount);
                 if (ds != null && ds.Tables.Count > 0) return ds.Tables[0];
             }
             catch (System.Exception ex)
