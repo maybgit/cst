@@ -9,6 +9,8 @@ namespace Mayb.DAL
 {
     public class BaseTable<T>
     {
+
+        #region 属性字段
         string updateCommandText;
         string insertCommandText;
         string deleteCommandText;
@@ -59,7 +61,21 @@ namespace Mayb.DAL
 
         public SqlService Sql = new SqlService();
         protected SqlDataReader reader;
-        protected string TableName;
+        protected string TableName; 
+        int recordCount;
+        public int RecordCount
+        {
+            get
+            {
+                return recordCount;
+            }
+
+            set
+            {
+                recordCount = value;
+            }
+        }
+        #endregion
         public BaseTable() { }
         public BaseTable(string tableName) { TableName = tableName; }
         public BaseTable(long id, string tableName)
@@ -117,19 +133,6 @@ namespace Mayb.DAL
             return null;
         }
 
-        int recordCount;
-        public int RecordCount
-        {
-            get
-            {
-                return recordCount;
-            }
-
-            set
-            {
-                recordCount = value;
-            }
-        }
         public DataTable GetPager(string fields, string where, string orderField, int pageIndex, int pageSize)
         {
             DataSet ds = new DataSet();
