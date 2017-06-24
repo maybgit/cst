@@ -126,7 +126,7 @@ namespace Mayb.DAL
         
         #region functions
         public class Functions{
-            static SqlService Sql = new SqlService();
+            public static SqlService Sql = new SqlService();
             static T Exec<T>(string funName,string paras) {
                 string sqlText = string.Format("select dbo.{0}({1})", funName, paras);
                 DataSet ds = Sql.ExecuteSqlDataSet(sqlText);
@@ -173,7 +173,7 @@ namespace Mayb.DAL
         
         #region procedures
         public class Procedures{
-            static SqlService Sql = new SqlService();
+            public static SqlService Sql = new SqlService();
             <% 
                 string[,] strs;
                 foreach (var item in procs)
