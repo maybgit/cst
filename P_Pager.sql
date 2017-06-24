@@ -1,39 +1,41 @@
 ﻿ -- =============================================
- -- AUTHOR:		<MAYB>
+ -- AUTHOR:		mayb
  -- CREATE DATE: 
- -- DESCRIPTION:	<分页存储过程>
+ -- DESCRIPTION:	分页存储过程
  -- =============================================
-IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[P_Pager]') AND type in (N'P', N'PC'))
-DROP PROCEDURE [dbo].[P_Pager]
+IF  EXISTS (SELECT * FROM SYS.OBJECTS WHERE OBJECT_ID = OBJECT_ID(N'[DBO].[P_PAGER]') AND TYPE IN (N'P', N'PC'))
+DROP PROCEDURE [DBO].[P_PAGER]
 GO
-CREATE PROCEDURE [dbo].[P_Pager]
+CREATE PROCEDURE [DBO].[P_PAGER]
 	@TABLENAME VARCHAR(100),					--表名
-	@Fields varchar(max),						--字段
+	@FIELDS VARCHAR(MAX),						--字段
 	@WHERE VARCHAR(MAX),						--条件
 	@ORDERFIELD VARCHAR(50),					--排序字段
-	@STARTINDEX INT,							--开始
-	@ENDINDEX INT,								--结束
+	@PAGEINDEX INT,								--当前页索引
+	@PAGESIZE INT,								--页的数量
 	@RECORDCOUNT INT OUTPUT						--检索的数据总数
 AS
 BEGIN
-	SET @where = REPLACE(@where, '\', '''')
-	SET @where = REPLACE(@where, 'ｗｈｅｒｅ', 'where')
+	DECLARE @STARTINDEX INT,@ENDINDEX INT
+	SET @ENDINDEX = @PAGEINDEX * @PAGESIZE
+	SET @STARTINDEX = @ENDINDEX - @PAGESIZE + 1
+	SET @WHERE = REPLACE(@WHERE, '\', '''')
+	SET @WHERE = REPLACE(@WHERE, 'ｗｈｅｒｅ', 'WHERE')
 	SET @TABLENAME = REPLACE(@TABLENAME, '\', '''')
 	IF(@ORDERFIELD='')
 	BEGIN
-		SET @ORDERFIELD = 'id desc'
+		SET @ORDERFIELD = 'ID DESC'
 	END
 	DECLARE @PAGINGWHERE VARCHAR(MAX) = ' WHERE ROWNUM BETWEEN ' + CAST(@STARTINDEX AS VARCHAR(10)) + ' AND ' + CAST(@ENDINDEX AS VARCHAR(10)) + ''
 	DECLARE @COUNTSQL NVARCHAR(MAX) = 'SELECT @RECORDCOUNT = COUNT(ID) FROM ' + @TABLENAME + ' WHERE 1 = 1 '
 	DECLARE @SQL VARCHAR(MAX) = 'SELECT TOP 100 PERCENT ROW_NUMBER() OVER(ORDER BY '+@ORDERFIELD+') AS ROWNUM, * FROM ' + @TABLENAME + ' WHERE 1 = 1 '
-	IF(@Fields = '')
+	IF(@FIELDS = '')
 	BEGIN
-		SET @Fields = '*'
+		SET @FIELDS = '*'
 	END
-	
 	SET @COUNTSQL += @WHERE
 	SET @SQL += @WHERE
-	SET @SQL = 'SELECT '+@Fields+' FROM (' + @SQL + ') AS T ' + @PAGINGWHERE
+	SET @SQL = 'SELECT '+@FIELDS+' FROM (' + @SQL + ') AS T ' + @PAGINGWHERE
 	PRINT @SQL
 	EXEC(@SQL)
 	EXEC SP_EXECUTESQL @COUNTSQL, N'@RECORDCOUNT INT OUT', @RECORDCOUNT OUT
