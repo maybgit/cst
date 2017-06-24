@@ -57,8 +57,8 @@ namespace Mayb.DAL
         private Dictionary<string, SqlDbType> columns;
         public Dictionary<string, SqlDbType> Columns { get { return columns ?? (columns = new Dictionary<string, SqlDbType>()); } set { columns = value; } }
         public SqlService Sql = new SqlService();
-        internal SqlDataReader reader;
-        internal string TableName;
+        protected SqlDataReader reader;
+        protected string TableName;
         public BaseTable() { }
         public BaseTable(string tableName) { TableName = tableName; }
         public BaseTable(long id, string tableName)
