@@ -56,6 +56,7 @@ namespace Mayb.DAL
         public List<T> Models { get; set; }
         private Dictionary<string, SqlDbType> columns;
         public Dictionary<string, SqlDbType> Columns { get { return columns ?? (columns = new Dictionary<string, SqlDbType>()); } set { columns = value; } }
+
         public SqlService Sql = new SqlService();
         protected SqlDataReader reader;
         protected string TableName;
@@ -113,6 +114,37 @@ namespace Mayb.DAL
             SelectCommandText = string.Format(SelectCommandText, string.IsNullOrEmpty(columns) ? "*" : columns, string.IsNullOrEmpty(where) ? "" : " where " + where, string.IsNullOrEmpty(orderBy) ? "" : " order by " + orderBy);
             DataSet ds = Sql.ExecuteSqlDataSet(SelectCommandText);
             if (null != ds && ds.Tables.Count > 0) return ds.Tables[0];
+            return null;
+        }
+
+        int recordCount;
+        public int RecordCount
+        {
+            get
+            {
+                return recordCount;
+            }
+
+            set
+            {
+                recordCount = value;
+            }
+        }
+        public DataTable GetPager(string fields, string where, string orderField, int pageIndex, int pageSize)
+        {
+            DataSet ds = new DataSet();
+            recordCount = 0;
+            try
+            {
+                int endIndex = pageIndex * pageSize;
+                int startIndex = endIndex - pageSize + 1;
+                DAL.Procedures.P_Pager(ref ds,TableName, fields, where, orderField, startIndex, endIndex, ref recordCount);
+                if (ds != null && ds.Tables.Count > 0) return ds.Tables[0];
+            }
+            catch (System.Exception ex)
+            {
+                throw ex;
+            }
             return null;
         }
     }
