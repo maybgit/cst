@@ -7,9 +7,8 @@ using System.Text;
 
 namespace Mayb.DAL
 {
-    public class BaseTable<T>
+    public class BaseTable<T> where T : new()
     {
-
         #region 属性字段
         string updateCommandText;
         string insertCommandText;
@@ -21,13 +20,13 @@ namespace Mayb.DAL
             {
                 if (string.IsNullOrEmpty(updateCommandText))
                 {
-                    foreach (var item in columns)
+                    foreach (var item in ModelProperties)
                     {
-                        if (string.Equals(item.Key, "@id", StringComparison.OrdinalIgnoreCase)) continue;
-                        updateCommandText += item.Key.TrimStart('@') + "=" + item.Key + ",";
+                        if (string.Equals(item.Name, "id", StringComparison.OrdinalIgnoreCase)) continue;
+                        updateCommandText += item.Name + "=@" + item.Name + ",";
                     }
                     updateCommandText = updateCommandText.TrimEnd(',');
-                    updateCommandText = " Update " + TableName + " Set " + updateCommandText + " Where ID=@ID ";
+                    updateCommandText = " UPDATE " + TableName + " SET " + updateCommandText + " WHERE ID=@ID ";
                 }
                 return updateCommandText;
             }
@@ -40,26 +39,34 @@ namespace Mayb.DAL
                 if (string.IsNullOrEmpty(insertCommandText))
                 {
                     string keys = "";
-                    foreach (var item in columns)
+                    foreach (var item in ModelProperties)
                     {
-                        if (string.Equals(item.Key, "@id", StringComparison.OrdinalIgnoreCase)) continue;
-                        keys += item.Key + ",";
+                        if (string.Equals(item.Name, "id", StringComparison.OrdinalIgnoreCase)) continue;
+                        keys += "@" + item.Name + ",";
                     }
                     keys = keys.TrimEnd(',');
-                    insertCommandText = string.Format(" Insert Into {0} ({1}) Values({2}) ", TableName, keys.Replace("@", ""), keys);
+                    insertCommandText = string.Format(" INSERT {0} ({1}) VALUES({2}) ", TableName, keys.Replace("@", ""), keys);
                 }
                 return insertCommandText;
             }
             set { insertCommandText = value; }
         }
-        public string DeleteCommandText { get { return deleteCommandText ?? " Delete from " + TableName + " where {0} "; } set { deleteCommandText = value; } }
+        public string DeleteCommandText { get { return deleteCommandText ?? " DELETE FROM " + TableName + " WHERE {0} "; } set { deleteCommandText = value; } }
         public string SelectCommandText { get { return selectCommandText ?? " SELECT {0} FROM " + TableName + " {1} {2} "; } set { selectCommandText = value; } }
         public T Model { get; set; }
         public List<T> Models { get; set; }
-        private Dictionary<string, SqlDbType> columns;
-        public Dictionary<string, SqlDbType> Columns { get { return columns ?? (columns = new Dictionary<string, SqlDbType>()); } set { columns = value; } }
 
-        //public SqlService Sql = new SqlService();
+        System.Reflection.PropertyInfo[] modelProperties;
+
+        public System.Reflection.PropertyInfo[] ModelProperties
+        {
+            get { return modelProperties ?? (modelProperties = Model.GetType().GetProperties()); }
+            set { modelProperties = value; }
+        }
+
+        //private Dictionary<string, SqlDbType> columns;
+        //public Dictionary<string, SqlDbType> Columns { get { return columns ?? (columns = new Dictionary<string, SqlDbType>()); } set { columns = value; } }
+
         SqlService sql;
         public SqlService Sql
         {
@@ -92,19 +99,49 @@ namespace Mayb.DAL
         #endregion
         public BaseTable() { }
         public BaseTable(string tableName) { TableName = tableName; }
+
+        /// <summary>
+        /// 当数据库表存在ID字段时可用
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="tableName">表名</param>
         public BaseTable(long id, string tableName)
         {
             TableName = tableName;
             Sql.AddParameter("@ID", SqlDbType.Int, id);
-            reader = Sql.ExecuteSqlReader("SELECT * FROM dbo." + TableName + " WHERE ID = @ID");
+            reader = Sql.ExecuteSqlReader("SELECT * FROM " + TableName + " WHERE ID = @ID");
+            ReadModels();
             Sql.Reset();
         }
+        /// <summary>
+        /// 从SqlDataReader读取数据为Model赋值
+        /// </summary>
+        /// <param name="reader"></param>
+        /// <param name="fun"></param>
         protected void ReadModels(SqlDataReader reader, Func<SqlDataReader, T> fun)
         {
             Models = new List<T>();
-            while (reader.Read()) { Models.Add(fun(reader)); }
+            while (reader.Read()) Models.Add(fun(reader));
             if (!reader.IsClosed) reader.Close();
         }
+
+        protected void ReadModels()
+        {
+            Models = new List<T>();
+            while (reader.Read())
+            {
+                Model = new T();
+                foreach (var item in ModelProperties)
+                {
+                    if (!Convert.IsDBNull(reader[item.Name]))
+                        item.SetValue(Model, reader[item.Name]);
+                }
+                Models.Add(Model);
+            }
+            if (!reader.IsClosed) reader.Close();
+        }
+
+        //通过反射Model参数化赋值
         void SetParametersValue()
         {
             if (Model != null)
@@ -114,7 +151,7 @@ namespace Mayb.DAL
                 foreach (var item in pis)
                 {
                     key = "@" + item.Name;
-                    Sql.AddParameter(key, columns[key], Sql.PrepareSqlValue(item.GetValue(Model, null)));
+                    Sql.AddParameter(key, GetSqlDbType(item.PropertyType.ToString()), Sql.PrepareSqlValue(item.GetValue(Model, null)));
                 }
             }
         }
@@ -131,13 +168,15 @@ namespace Mayb.DAL
         public int Insert()
         {
             SetParametersValue();
-            try { return Convert.ToInt32(Sql.ExecuteSqlScalar(InsertCommandText)); } catch (Exception ex) { throw ex; }
+            try { return Convert.ToInt32(Sql.ExecuteSqlScalar(InsertCommandText)); }
+            catch (Exception ex) { throw ex; }
         }
-        internal void Select(string where, int? top, Func<SqlDataReader, T> fun)
+        public List<T> Select(string where = null, int? top = null)
         {
             SelectCommandText = string.Format(SelectCommandText, top == null ? "*" : "top " + top + " *", string.IsNullOrEmpty(where) ? "" : " where " + where, "");
             reader = Sql.ExecuteSqlReader(SelectCommandText);
-            ReadModels(reader, fun);
+            ReadModels();
+            return Models;
         }
         public DataTable Select(string where, string columns, string orderBy)
         {
@@ -147,22 +186,39 @@ namespace Mayb.DAL
             return null;
         }
 
-        public DataTable GetPager(string fields, string where, string orderField, int pageIndex, int pageSize)
+        SqlDbType GetSqlDbType(string propertyType)
         {
-            DataSet ds = new DataSet();
-            recordCount = 0;
-            try
+            switch (propertyType)
             {
-                int endIndex = pageIndex * pageSize;
-                int startIndex = endIndex - pageSize + 1;
-                DAL.Procedures.P_Pager(ref ds, TableName, fields, where, orderField, startIndex, endIndex, ref recordCount);
-                if (ds != null && ds.Tables.Count > 0) return ds.Tables[0];
+                case "System.Boolean":
+                    return SqlDbType.Bit;
+                case "System.Byte":
+                    return SqlDbType.TinyInt;
+                case "System.Int16":
+                    return SqlDbType.SmallInt;
+                case "System.Int32":
+                    return SqlDbType.Int;
+                case "System.Int64":
+                    return SqlDbType.BigInt;
+                case "System.Single":
+                    return SqlDbType.Real;
+                case "System.Double":
+                    return SqlDbType.Float;
+                case "System.Decimal":
+                    return SqlDbType.Decimal;
+                case "System.DateTime":
+                    return SqlDbType.DateTime;
+                case "System.Byte[]":
+                    return SqlDbType.Binary;
+                case "System.String":
+                    return SqlDbType.NVarChar;
+                case "System.Guid":
+                    return SqlDbType.UniqueIdentifier;
+                case "System.Object":
+                    return SqlDbType.Variant;
+                default:
+                    return SqlDbType.NVarChar;
             }
-            catch (System.Exception ex)
-            {
-                throw ex;
-            }
-            return null;
         }
     }
 
