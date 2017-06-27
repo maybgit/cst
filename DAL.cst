@@ -61,10 +61,7 @@ namespace Mayb.DAL
                     if(isInitModel) Model=new Models.<%=item.Name%>Model();
                     InitColumns();
                 }
-                public <%= item.Name %>(long id):base(id,"<%=item.Name %>"){ 
-                    ReadModels(reader,ReadModel);
-                    InitColumns();
-                }
+                public <%= item.Name %>(long id):base(id,"<%=item.Name %>"){ InitColumns(); }
                 
                 void InitColumns() {
                 <%
@@ -72,58 +69,32 @@ namespace Mayb.DAL
            			{
                        var column = item.Columns[i];
            			 %>
-                     Columns.Add("@<%=column.Name %>",SqlDbType.<%=SqlNativeSqlDb[column.NativeType.ToString()] %>);
+                     Columns.Add("<%=column.Name %>",SqlDbType.<%=SqlNativeSqlDb[column.NativeType.ToString()] %>);
                      <%
            			}%>
                 }
-                
-                Models.<%=item.Name%>Model ReadModel(SqlDataReader reader)
-                {
-                    Model = new Models.<%=item.Name%>Model();
-                <% foreach (var itemColumn in item.Columns)
-                    {
-                    int index = item.Columns.IndexOf(itemColumn);
-                    string dataType = DbDataReader[itemColumn.DataType.ToString()];
-                    %>
-                    if(!reader.IsDBNull(<%=index%>)) Model.<%=itemColumn.Name %> = <%=dataType!="GetBytes"?"reader."+dataType+"("+index+")":"null" %>;
-                    <%
-                    } %>
-                    return Model;
-                }
-                public List<Models.<%=item.Name%>Model> Select(string where=null, int? top=null){base.Select(where,top,ReadModel);return Models;}
             }
             <%
             }%>
         }
         #endregion
         
+        <% if(SourceDatabase.Views.Count>0){ %>
         #region views
         public class Views{
             <% foreach (var item in SourceDatabase.Views)
                 {%>
             public class <%=item.Name %>: BaseTable<Models.<%=item.Name%>Model>{
                 public <%=item.Name %>():base("<%=item.Name %>"){}
-                public <%= item.Name %>(long id):base(id,"<%=item.Name %>"){ ReadModels(reader,ReadModel);}
-                Models.<%=item.Name%>Model ReadModel(SqlDataReader reader)
-                {
-                    Model = new Models.<%=item.Name%>Model();
-                <% foreach (var itemColumn in item.Columns)
-                    {
-                    int index = item.Columns.IndexOf(itemColumn);
-                    string dataType = DbDataReader[itemColumn.DataType.ToString()];
-                    %>
-                    if(!reader.IsDBNull(<%=index%>)) Model.<%=itemColumn.Name %> = <%=dataType!="GetBytes"?"reader."+dataType+"("+index+")":"null" %>;
-                    <%
-                    } %>
-                    return Model;
-                }
-                public List<Models.<%=item.Name%>Model> Select(string where=null, int? top=null){base.Select(where,top,ReadModel);return Models;}
+                public <%= item.Name %>(long id):base(id,"<%=item.Name %>"){ }
             }
                 <%
                 } %>
         }
         #endregion
+        <% } %>
         
+        <% if(allCommands.Count()>0) {%>
         #region functions
         public class Functions{
             public static SqlService Sql = new SqlService();
@@ -170,7 +141,9 @@ namespace Mayb.DAL
                 } %>
         }
         #endregion
+        <% } %>
         
+        <% if(procs.Count()>0){ %>
         #region procedures
         public class Procedures{
             public static SqlService Sql = new SqlService();
@@ -265,6 +238,7 @@ namespace Mayb.DAL
              <%} %>
         }
         #endregion
+         <% } %>
             
         #region models
         public class Models{
