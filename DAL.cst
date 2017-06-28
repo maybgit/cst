@@ -4,9 +4,9 @@
 <%@ Assembly Name="SchemaExplorer" %>
 <%@ Import Namespace="SchemaExplorer" %>
 <%@ Property Name="SourceDatabase" Type="SchemaExplorer.DatabaseSchema" IncludeFunctions="false" %>
-<%@ Property Name="ImportBaseTableFile" Type="Boolean" Default="true" Optional="True" %>
-<%@ Property Name="ImportSqlServiceFile" Type="Boolean" Default="true" Optional="True" %>
-<%@ Property Name="ConnectionStringName" Type="String" Default="ConnectionString" Optional="True" %>
+<%--<%@ Property Name="ImportBaseTableFile" Type="Boolean" Default="true" Optional="True" %>
+<%@ Property Name="ImportSqlServiceFile" Type="Boolean" Default="true" Optional="True" %>--%>
+<%--<%@ Property Name="ConnectionStringName" Type="String" Default="ConnectionString" Optional="True" %>--%>
 <%@ Import Namespace="System.Text" %>
 <%@ Import Namespace="System.Linq" %>
 <%@ Import Namespace="System.Text.RegularExpressions" %>
@@ -58,12 +58,23 @@ namespace Mayb.DAL
                 string idName = null;
             %>
             public class <%=item.Name%>: BaseTable<Models.<%=item.Name%>Model>{
-                public <%=item.Name %>():base("<%=item.Name %>"){}
-                public <%=item.Name %>(bool initModel = false):base("<%=item.Name %>",initModel){ }
-                public <%= item.Name %>(long id):base("<%=item.Name %>",id){ }
+                public <%=item.Name %>():base("<%=item.Name %>"){InitColumns();}
+                public <%=item.Name %>(bool initModel = false):base("<%=item.Name %>",initModel){ InitColumns();}
+                public <%= item.Name %>(long id):base("<%=item.Name %>",id){InitColumns(); }
+                void InitColumns() {
+                <%
+                   for (int i = 0; i < item.Columns.Count; i++)
+           			{
+                       var column = item.Columns[i];
+           			 %>
+                     Columns.Add("<%=column.Name %>",SqlDbType.<%=SqlNativeSqlDb[column.NativeType.ToString()] %>);
+                     <%
+           			}%>
+                }
             }
             <%
             }%>
+            
         }
         #endregion
         
@@ -264,7 +275,7 @@ namespace Mayb.DAL
             
         }
         #endregion
-       <% if(ImportBaseTableFile){
+       <%--<% if(ImportBaseTableFile){
            %>
            <%=ReadFile("BaseTable.cs") %>
            <%
@@ -273,7 +284,7 @@ namespace Mayb.DAL
            %>
            <%=ReadFile("SqlService.cs") %>
            <%
-       } %>
+       } %>--%>
     }
 
 <script runat="template">
