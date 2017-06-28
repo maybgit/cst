@@ -68,16 +68,16 @@ namespace Mayb.DAL
         public SqlService Sql { get { return sql ?? (sql = new SqlService()); } set { sql = value; } }
         protected SqlDataReader reader;
         protected string tableName;
-        int recordCount;
-        public int RecordCount { get { return recordCount; } set { recordCount = value; } }
+        //int recordCount;
+        //public int RecordCount { get { return recordCount; } set { recordCount = value; } }
 
         Dictionary<string, SqlDbType> columns;
-        public Dictionary<string, SqlDbType> Columns { get { return columns; } set { columns = value; } }
+        public Dictionary<string, SqlDbType> Columns { get { return columns ?? (columns = new Dictionary<string, SqlDbType>()); } set { columns = value; } }
 
-        string where;
-        public string Where { get { return where ?? (where = "ID=@ID"); } set { where = value; } }
-        string selectColumns;
-        public string SelectColumns { get { return selectColumns ?? (selectColumns = "*"); } set { selectColumns = value; } }
+        //string where;
+        //public string Where { get { return where ?? (where = "ID=@ID"); } set { where = value; } }
+        //string selectColumns;
+        //public string SelectColumns { get { return selectColumns ?? (selectColumns = "*"); } set { selectColumns = value; } }
 
         #endregion
 
@@ -93,7 +93,7 @@ namespace Mayb.DAL
             Sql.Reset();
         }
 
-        protected void ReadModels()
+        void ReadModels()
         {
             Models = new List<T>();
             while (reader.Read())
@@ -119,7 +119,7 @@ namespace Mayb.DAL
                 foreach (var item in pis)
                 {
                     key = "@" + item.Name;
-                    Sql.AddParameter(key, GetSqlDbType(item.PropertyType.ToString()), Sql.PrepareSqlValue(item.GetValue(Model, null)));
+                    Sql.AddParameter(key, Columns[item.PropertyType.ToString()], Sql.PrepareSqlValue(item.GetValue(Model, null)));
                 }
             }
         }
