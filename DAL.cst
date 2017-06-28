@@ -18,6 +18,7 @@
 <%@ Map Name="SqlNativeSqlDb" Src="SqlNativeType-SqlDbType" Description="SqlNativeType to SqlDbType Map" %>
 <%@ Map Name="SqlNativeTypeToDbType" Src="SqlNativeType-DbType" %>
 <%@ Map Name="DbTypeCSharp" Src="DbType-CSharp" Description="DbType to CSharp Map" %>
+<%@ Map Name="CSharpKeywordEscape" Src="CSharpKeywordEscape" Description="C# keywords escape map" %>
 
 using System;
 using System.IO;
@@ -59,7 +60,7 @@ namespace Mayb.DAL
             public class <%=item.Name%>: BaseTable<Models.<%=item.Name%>Model>{
                 public <%=item.Name %>():base("<%=item.Name %>"){}
                 public <%=item.Name %>(bool initModel = false):base("<%=item.Name %>",initModel){ }
-                public <%= item.Name %>(long id):base(id,"<%=item.Name %>"){ }
+                public <%= item.Name %>(long id):base("<%=item.Name %>",id){ }
             }
             <%
             }%>
@@ -73,7 +74,7 @@ namespace Mayb.DAL
                 {%>
             public class <%=item.Name %>: BaseTable<Models.<%=item.Name%>Model>{
                 public <%=item.Name %>():base("<%=item.Name %>"){}
-                public <%= item.Name %>(long id):base(id,"<%=item.Name %>"){ }
+                public <%= item.Name %>(long id):base("<%=item.Name %>",id){ }
             }
                 <%
                 } %>
@@ -239,7 +240,7 @@ namespace Mayb.DAL
                 /// <summary>
                 /// <%--<%=itemColumn.Description %>--%>
                 /// </summary>
-                public <%=itemColumn.SystemType.Name +" "+itemColumn.Name+"" %>{ 
+                public <%=itemColumn.SystemType.Name +" "+CSharpKeywordEscape[itemColumn.Name]??itemColumn.Name +"" %>{ 
                     get{ return _<%=itemColumn.Name%>; } 
                     set{ _<%=itemColumn.Name%> = value;}
                 }
@@ -255,7 +256,7 @@ namespace Mayb.DAL
                 <%foreach (var itemColumn in item.Columns)
                 {%>
                 <%=itemColumn.SystemType.Name +" _"+itemColumn.Name+";" %>
-                public <%=itemColumn.SystemType.Name +" "+itemColumn.Name+"" %>{ get{ return _<%=itemColumn.Name%>; } set{ _<%=itemColumn.Name%> = value;}}
+                public <%=itemColumn.SystemType.Name +" "+CSharpKeywordEscape[itemColumn.Name]??itemColumn.Name+"" %>{ get{ return _<%=itemColumn.Name%>; } set{ _<%=itemColumn.Name%> = value;}}
                 <%}%>
              }
              <%
