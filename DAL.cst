@@ -59,20 +59,8 @@ namespace Mayb.DAL
             public class <%=item.Name%>: BaseTable<Models.<%=item.Name%>Model>{
                 public <%=item.Name %>(bool isInitModel=false):base("<%=item.Name %>"){ 
                     if(isInitModel) Model=new Models.<%=item.Name%>Model();
-                    InitColumns();
                 }
-                public <%= item.Name %>(long id):base(id,"<%=item.Name %>"){ InitColumns(); }
-                
-                void InitColumns() {
-                <%
-                   for (int i = 0; i < item.Columns.Count; i++)
-           			{
-                       var column = item.Columns[i];
-           			 %>
-                     Columns.Add("<%=column.Name %>",SqlDbType.<%=SqlNativeSqlDb[column.NativeType.ToString()] %>);
-                     <%
-           			}%>
-                }
+                public <%= item.Name %>(long id):base(id,"<%=item.Name %>"){ }
             }
             <%
             }%>
