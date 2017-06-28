@@ -64,67 +64,33 @@ namespace Mayb.DAL
             set { modelProperties = value; }
         }
 
-        //private Dictionary<string, SqlDbType> columns;
-        //public Dictionary<string, SqlDbType> Columns { get { return columns ?? (columns = new Dictionary<string, SqlDbType>()); } set { columns = value; } }
-
         SqlService sql;
-        public SqlService Sql
-        {
-            get
-            {
-                return sql ?? (sql = new SqlService());
-            }
-
-            set
-            {
-                sql = value;
-            }
-        }
+        public SqlService Sql { get { return sql ?? (sql = new SqlService()); } set { sql = value; } }
         protected SqlDataReader reader;
         protected string tableName;
         int recordCount;
-        public int RecordCount
-        {
-            get
-            {
-                return recordCount;
-            }
+        public int RecordCount { get { return recordCount; } set { recordCount = value; } }
 
-            set
-            {
-                recordCount = value;
-            }
-        }
+        Dictionary<string, SqlDbType> columns;
+        public Dictionary<string, SqlDbType> Columns { get { return columns; } set { columns = value; } }
+
+        string where;
+        public string Where { get { return where ?? (where = "ID=@ID"); } set { where = value; } }
+        string selectColumns;
+        public string SelectColumns { get { return selectColumns ?? (selectColumns = "*"); } set { selectColumns = value; } }
 
         #endregion
-        public BaseTable(string tableName,bool initModel = false) {
-            this.tableName = tableName;
-            if (initModel) Model = new T();
-        }
 
-        /// <summary>
-        /// 当数据库表存在ID字段时可用
-        /// </summary>
-        /// <param name="id"></param>
-        /// <param name="tableName">表名</param>
-        public BaseTable(long id, string tableName)
+        public BaseTable(string tableName) { this.tableName = tableName; }
+        public BaseTable(string tableName, bool initModel) : this(tableName) { if (initModel) Model = new T(); }
+
+        public BaseTable(string tableName, long id)
+            : this(tableName)
         {
-            this.tableName = tableName;
             Sql.AddParameter("@ID", SqlDbType.Int, id);
-            reader = Sql.ExecuteSqlReader("SELECT * FROM " + tableName + " WHERE ID = @ID");
+            reader = Sql.ExecuteSqlReader("SELECT * FROM "+tableName+" WHERE ID=@ID");
             ReadModels();
             Sql.Reset();
-        }
-        /// <summary>
-        /// 从SqlDataReader读取数据为Model赋值
-        /// </summary>
-        /// <param name="reader"></param>
-        /// <param name="fun"></param>
-        protected void ReadModels(SqlDataReader reader, Func<SqlDataReader, T> fun)
-        {
-            Models = new List<T>();
-            while (reader.Read()) Models.Add(fun(reader));
-            if (!reader.IsClosed) reader.Close();
         }
 
         protected void ReadModels()
