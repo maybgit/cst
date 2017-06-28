@@ -8,6 +8,7 @@ using System.Data.SqlClient;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
@@ -29,6 +30,7 @@ namespace Mayb.DAL
         private SqlCommand _cmd;
         protected int _commandTimeout = 30;
         public SqlService() { _connectionString = ConfigurationSettings.AppSettings["ConnectionString"]; }
+        //public SqlService() { _connectionString = ConfigurationManager.ConnectionStrings["ConnectionString"].ConnectionString; }
         public SqlService(string connectionString) { _connectionString = connectionString; }
         public SqlService(string server, string database, string user, string password) { this.ConnectionString = "Server=" + server + ";Database=" + database + ";User ID=" + user + ";Password=" + password + ";"; }
         public SqlService(string server, string database) { this.ConnectionString = "Server=" + server + ";Database=" + database + ";Integrated Security=true;"; }
@@ -56,10 +58,10 @@ namespace Mayb.DAL
                 }
                 return parameters;
             }
-            set { parameters = value;}
+            set { parameters = value; }
         }
 
-        protected SqlCommand cmd { get { return _cmd??(_cmd=new SqlCommand());} set { _cmd = value; } }
+        protected SqlCommand cmd { get { return _cmd ?? (_cmd = new SqlCommand()); } set { _cmd = value; } }
 
         private void CopyParameters(SqlCommand command)
         {
@@ -622,14 +624,14 @@ namespace Mayb.DAL
                 }
                 else
                 {
-                    throw new InvalidOperationException("You must set a connection object or specify a connection string before calling Connect.");
+                    throw new InvalidOperationException("在调用连接之前，必须设置连接对象或指定连接字符串。");
                 }
             }
         }
         public void Disconnect() { if ((_connection != null) && (_connection.State != ConnectionState.Closed)) { _connection.Close(); } if (_connection != null) _connection.Dispose(); if (_transaction != null) _transaction.Dispose(); _transaction = null; _connection = null; }
-        public void BeginTransaction() { if (_connection != null) { _transaction = _connection.BeginTransaction(); } else { throw new InvalidOperationException("You must have a valid connection object before calling BeginTransaction."); } }
-        public void CommitTransaction() { if (_transaction != null) { try { _transaction.Commit(); } catch (Exception) { throw; } } else { throw new InvalidOperationException("You must call BeginTransaction before calling CommitTransaction."); } }
-        public void RollbackTransaction() { if (_transaction != null) { try { _transaction.Rollback(); } catch (Exception) { throw; } } else { throw new InvalidOperationException("You must call BeginTransaction before calling RollbackTransaction."); } }
+        public void BeginTransaction() { if (_connection != null) { _transaction = _connection.BeginTransaction(); } else { throw new InvalidOperationException("数据库连接对象为NULL"); } }
+        public void CommitTransaction() { if (_transaction != null) { try { _transaction.Commit(); } catch (Exception) { throw; } } else { throw new InvalidOperationException("没有可提交的事务"); } }
+        public void RollbackTransaction() { if (_transaction != null) { try { _transaction.Rollback(); } catch (Exception) { throw; } } else { throw new InvalidOperationException("没有可回滚的事务。"); } }
         public void Reset() { if (parameterList != null) { parameterList.Clear(); } if (parameters != null) { parameters = null; } }
     }
 }
