@@ -7,6 +7,20 @@ using System.Text;
 
 namespace Mayb.DAL
 {
+    public class SqlTypeAttribute : Attribute
+    {
+        SqlDbType sqlDbType;
+
+        public SqlDbType SqlDbType
+        {
+            get { return sqlDbType; }
+            set { sqlDbType = value; }
+        }
+        public SqlTypeAttribute(SqlDbType type)
+        {
+            sqlDbType = type;
+        }
+    }
     public class BaseTable<T> where T : new()
     {
         #region 属性字段
