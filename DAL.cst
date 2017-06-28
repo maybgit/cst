@@ -57,9 +57,8 @@ namespace Mayb.DAL
                 string idName = null;
             %>
             public class <%=item.Name%>: BaseTable<Models.<%=item.Name%>Model>{
-                public <%=item.Name %>(bool isInitModel=false):base("<%=item.Name %>"){ 
-                    if(isInitModel) Model=new Models.<%=item.Name%>Model();
-                }
+                public <%=item.Name %>():base("<%=item.Name %>"){}
+                public <%=item.Name %>(bool initModel = false):base("<%=item.Name %>",initModel){ }
                 public <%= item.Name %>(long id):base(id,"<%=item.Name %>"){ }
             }
             <%
