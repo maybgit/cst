@@ -26,7 +26,7 @@ namespace Mayb.DAL
                         updateCommandText += item.Name + "=@" + item.Name + ",";
                     }
                     updateCommandText = updateCommandText.TrimEnd(',');
-                    updateCommandText = " UPDATE " + TableName + " SET " + updateCommandText + " WHERE ID=@ID ";
+                    updateCommandText = " UPDATE " + tableName + " SET " + updateCommandText + " WHERE ID=@ID ";
                 }
                 return updateCommandText;
             }
@@ -45,14 +45,14 @@ namespace Mayb.DAL
                         keys += "@" + item.Name + ",";
                     }
                     keys = keys.TrimEnd(',');
-                    insertCommandText = string.Format(" INSERT {0} ({1}) VALUES({2}) ", TableName, keys.Replace("@", ""), keys);
+                    insertCommandText = string.Format(" INSERT {0} ({1}) VALUES({2}) ", tableName, keys.Replace("@", ""), keys);
                 }
                 return insertCommandText;
             }
             set { insertCommandText = value; }
         }
-        public string DeleteCommandText { get { return deleteCommandText ?? " DELETE FROM " + TableName + " WHERE {0} "; } set { deleteCommandText = value; } }
-        public string SelectCommandText { get { return selectCommandText ?? " SELECT {0} FROM " + TableName + " {1} {2} "; } set { selectCommandText = value; } }
+        public string DeleteCommandText { get { return deleteCommandText ?? " DELETE FROM " + tableName + " WHERE {0} "; } set { deleteCommandText = value; } }
+        public string SelectCommandText { get { return selectCommandText ?? " SELECT {0} FROM " + tableName + " {1} {2} "; } set { selectCommandText = value; } }
         public T Model { get; set; }
         public List<T> Models { get; set; }
 
@@ -81,7 +81,7 @@ namespace Mayb.DAL
             }
         }
         protected SqlDataReader reader;
-        protected string TableName;
+        protected string tableName;
         int recordCount;
         public int RecordCount
         {
@@ -97,8 +97,10 @@ namespace Mayb.DAL
         }
 
         #endregion
-        public BaseTable() { }
-        public BaseTable(string tableName) { TableName = tableName; }
+        public BaseTable(string tableName,bool initModel = false) {
+            this.tableName = tableName;
+            if (initModel) Model = new T();
+        }
 
         /// <summary>
         /// 当数据库表存在ID字段时可用
@@ -107,9 +109,9 @@ namespace Mayb.DAL
         /// <param name="tableName">表名</param>
         public BaseTable(long id, string tableName)
         {
-            TableName = tableName;
+            this.tableName = tableName;
             Sql.AddParameter("@ID", SqlDbType.Int, id);
-            reader = Sql.ExecuteSqlReader("SELECT * FROM " + TableName + " WHERE ID = @ID");
+            reader = Sql.ExecuteSqlReader("SELECT * FROM " + tableName + " WHERE ID = @ID");
             ReadModels();
             Sql.Reset();
         }
@@ -211,7 +213,7 @@ namespace Mayb.DAL
                 case "System.Byte[]":
                     return SqlDbType.Binary;
                 case "System.String":
-                    return SqlDbType.NVarChar;
+                    return SqlDbType.Text;
                 case "System.Guid":
                     return SqlDbType.UniqueIdentifier;
                 case "System.Object":
