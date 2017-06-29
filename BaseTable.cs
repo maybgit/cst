@@ -7,74 +7,56 @@ using System.Text;
 
 namespace Mayb.DAL
 {
-    public class SqlTypeAttribute : Attribute
-    {
-        SqlDbType sqlDbType;
-
-        public SqlDbType SqlDbType
-        {
-            get { return sqlDbType; }
-            set { sqlDbType = value; }
-        }
-        public SqlTypeAttribute(SqlDbType type)
-        {
-            sqlDbType = type;
-        }
-    }
     public class BaseTable<T> where T : new()
     {
-        #region 属性字段
-        string updateCommandText;
-        string insertCommandText;
-        string deleteCommandText;
-        string selectCommandText;
-        public string UpdateCommandText
+        string columns;
+
+        public string Columns
+        {
+            get { return columns ?? (columns = "*"); }
+            set { columns = value; }
+        }
+        string where;
+
+        public string Where
+        {
+            get { return where; }
+            set { where = " where " + value; }
+        }
+
+        public T Model
         {
             get
             {
-                if (string.IsNullOrEmpty(updateCommandText))
-                {
-                    foreach (var item in ModelProperties)
-                    {
-                        if (string.Equals(item.Name, "id", StringComparison.OrdinalIgnoreCase)) continue;
-                        updateCommandText += item.Name + "=@" + item.Name + ",";
-                    }
-                    updateCommandText = updateCommandText.TrimEnd(',');
-                    updateCommandText = " UPDATE " + tableName + " SET " + updateCommandText + " WHERE ID=@ID ";
-                }
-                return updateCommandText;
+                if (Models.Count > 0) return Models[0];
+                return default(T);
             }
-            set { updateCommandText = value; }
         }
-        public string InsertCommandText
+        public List<T> Models
         {
             get
             {
-                if (string.IsNullOrEmpty(insertCommandText))
+                List<T> list = new List<T>();
+                using (SqlDataReader reader = Sql.ExecuteSqlReader(string.Format("select {0} from {1} {2}", Columns, tableName, Where)))
                 {
-                    string keys = "";
-                    foreach (var item in ModelProperties)
+                    while (reader.Read())
                     {
-                        if (string.Equals(item.Name, "id", StringComparison.OrdinalIgnoreCase)) continue;
-                        keys += "@" + item.Name + ",";
+                        T t = new T();
+                        foreach (var item in ModelProperties)
+                            if (!Convert.IsDBNull(reader[item.Name]))
+                                item.SetValue(t, reader[item.Name]);
+                        list.Add(t);
                     }
-                    keys = keys.TrimEnd(',');
-                    insertCommandText = string.Format(" INSERT {0} ({1}) VALUES({2}) ", tableName, keys.Replace("@", ""), keys);
                 }
-                return insertCommandText;
+                return list;
             }
-            set { insertCommandText = value; }
         }
-        public string DeleteCommandText { get { return deleteCommandText ?? " DELETE FROM " + tableName + " WHERE {0} "; } set { deleteCommandText = value; } }
-        public string SelectCommandText { get { return selectCommandText ?? " SELECT {0} FROM " + tableName + " {1} {2} "; } set { selectCommandText = value; } }
-        public T Model { get; set; }
-        public List<T> Models { get; set; }
 
         System.Reflection.PropertyInfo[] modelProperties;
 
         public System.Reflection.PropertyInfo[] ModelProperties
         {
-            get { return modelProperties ?? (modelProperties = Model.GetType().GetProperties()); }
+            get { return modelProperties ?? (modelProperties = new T().GetType().GetProperties()); }
             set { modelProperties = value; }
         }
 
@@ -82,125 +64,43 @@ namespace Mayb.DAL
         public SqlService Sql { get { return sql ?? (sql = new SqlService()); } set { sql = value; } }
         protected SqlDataReader reader;
         protected string tableName;
-        //int recordCount;
-        //public int RecordCount { get { return recordCount; } set { recordCount = value; } }
-
-        Dictionary<string, SqlDbType> columns;
-        public Dictionary<string, SqlDbType> Columns { get { return columns ?? (columns = new Dictionary<string, SqlDbType>()); } set { columns = value; } }
-
-        //string where;
-        //public string Where { get { return where ?? (where = "ID=@ID"); } set { where = value; } }
-        //string selectColumns;
-        //public string SelectColumns { get { return selectColumns ?? (selectColumns = "*"); } set { selectColumns = value; } }
-
-        #endregion
 
         public BaseTable(string tableName) { this.tableName = tableName; }
-        public BaseTable(string tableName, bool initModel) : this(tableName) { if (initModel) Model = new T(); }
 
-        public BaseTable(string tableName, long id)
-            : this(tableName)
-        {
-            Sql.AddParameter("@ID", SqlDbType.Int, id);
-            reader = Sql.ExecuteSqlReader("SELECT * FROM "+tableName+" WHERE ID=@ID");
-            ReadModels();
-            Sql.Reset();
-        }
-
-        void ReadModels()
-        {
-            Models = new List<T>();
-            while (reader.Read())
-            {
-                Model = new T();
-                foreach (var item in ModelProperties)
-                {
-                    if (!Convert.IsDBNull(reader[item.Name]))
-                        item.SetValue(Model, reader[item.Name]);
-                }
-                Models.Add(Model);
-            }
-            if (!reader.IsClosed) reader.Close();
-        }
-
-        //通过反射Model参数化赋值
-        void SetParametersValue()
-        {
-            if (Model != null)
-            {
-                System.Reflection.PropertyInfo[] pis = Model.GetType().GetProperties();
-                string key;
-                foreach (var item in pis)
-                {
-                    key = "@" + item.Name;
-                    Sql.AddParameter(key, Columns[item.PropertyType.ToString()], Sql.PrepareSqlValue(item.GetValue(Model, null)));
-                }
-            }
-        }
         public int Update()
         {
-            SetParametersValue();
-            return Sql.ExecuteSql(UpdateCommandText);
+            try
+            {
+                if (string.IsNullOrEmpty(Columns)) throw new Exception("Columns 不能为空。");
+                string[] cols = Columns.Split(',');
+                for (int i = 0; i < cols.Length; i++) cols[i] = cols[i] + "=@" + cols[i];
+                string sql = "update set " + string.Join(",", cols) + Where;
+                if (string.IsNullOrEmpty(Where)) throw new Exception("更新语句 Where 条件不能为空 " + sql);
+                return Sql.ExecuteSql(sql);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
         }
-        public int Delete(string where)
+        public int Delete()
         {
-            DeleteCommandText = string.Format(DeleteCommandText, where);
-            return Sql.ExecuteSql(DeleteCommandText);
+            try
+            {
+                if (string.IsNullOrEmpty(Where)) throw new Exception("delete 语句 Where 条件不能为空,如需全部删除，可设置为1=1。");
+                string sql = string.Format("delete from {0} {1}", tableName, Where);
+                return Sql.ExecuteSql(sql);
+            }
+            catch (Exception ex) { throw ex; }
         }
         public int Insert()
         {
-            SetParametersValue();
-            try { return Convert.ToInt32(Sql.ExecuteSqlScalar(InsertCommandText)); }
-            catch (Exception ex) { throw ex; }
-        }
-        public List<T> Select(string where = null, int? top = null)
-        {
-            SelectCommandText = string.Format(SelectCommandText, top == null ? "*" : "top " + top + " *", string.IsNullOrEmpty(where) ? "" : " where " + where, "");
-            reader = Sql.ExecuteSqlReader(SelectCommandText);
-            ReadModels();
-            return Models;
-        }
-        public DataTable Select(string where, string columns, string orderBy)
-        {
-            SelectCommandText = string.Format(SelectCommandText, string.IsNullOrEmpty(columns) ? "*" : columns, string.IsNullOrEmpty(where) ? "" : " where " + where, string.IsNullOrEmpty(orderBy) ? "" : " order by " + orderBy);
-            DataSet ds = Sql.ExecuteSqlDataSet(SelectCommandText);
-            if (null != ds && ds.Tables.Count > 0) return ds.Tables[0];
-            return null;
-        }
-
-        SqlDbType GetSqlDbType(string propertyType)
-        {
-            switch (propertyType)
+            try
             {
-                case "System.Boolean":
-                    return SqlDbType.Bit;
-                case "System.Byte":
-                    return SqlDbType.TinyInt;
-                case "System.Int16":
-                    return SqlDbType.SmallInt;
-                case "System.Int32":
-                    return SqlDbType.Int;
-                case "System.Int64":
-                    return SqlDbType.BigInt;
-                case "System.Single":
-                    return SqlDbType.Real;
-                case "System.Double":
-                    return SqlDbType.Float;
-                case "System.Decimal":
-                    return SqlDbType.Decimal;
-                case "System.DateTime":
-                    return SqlDbType.DateTime;
-                case "System.Byte[]":
-                    return SqlDbType.Binary;
-                case "System.String":
-                    return SqlDbType.Text;
-                case "System.Guid":
-                    return SqlDbType.UniqueIdentifier;
-                case "System.Object":
-                    return SqlDbType.Variant;
-                default:
-                    return SqlDbType.NVarChar;
+                string sql = string.Format("insert {0}({1}) values(@{2})", tableName, Columns, Columns.Replace(",", ",@"));
+                return Sql.ExecuteSql(sql);
             }
+            catch (Exception ex) { throw ex; }
         }
     }
 
