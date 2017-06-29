@@ -58,18 +58,23 @@ namespace Mayb.DAL
                 string idName = null;
             %>
             public class <%=item.Name%>: BaseTable<Models.<%=item.Name%>Model>{
-                public <%=item.Name %>():base("<%=item.Name %>"){InitColumns();}
-                public <%=item.Name %>(bool initModel = false):base("<%=item.Name %>",initModel){ InitColumns();}
-                public <%= item.Name %>(long id):base("<%=item.Name %>",id){InitColumns(); }
-                void InitColumns() {
+                public <%=item.Name %>():base("<%=item.Name %>"){AddColumnType();}
+                public <%=item.Name %>(string where):this(){base.Where=where;}
+                public <%=item.Name %>(int top):this(){base.Top=top; }
+                public <%=item.Name %>(string where,int top):this(){base.Where=where; base.Top=top;}
+                void AddColumnType() {
                 <%
                    for (int i = 0; i < item.Columns.Count; i++)
            			{
                        var column = item.Columns[i];
            			 %>
-                     Columns.Add("<%=column.Name %>",SqlDbType.<%=SqlNativeSqlDb[column.NativeType.ToString()] %>);
+                     ColumnType.Add("<%=column.Name %>",SqlDbType.<%=SqlNativeSqlDb[column.NativeType.ToString()] %>);
                      <%
            			}%>
+                }
+                public enum EnumColumn{
+                    a=0,
+                    b
                 }
             }
             <%
@@ -85,7 +90,7 @@ namespace Mayb.DAL
                 {%>
             public class <%=item.Name %>: BaseTable<Models.<%=item.Name%>Model>{
                 public <%=item.Name %>():base("<%=item.Name %>"){}
-                public <%= item.Name %>(long id):base("<%=item.Name %>",id){ }
+                public <%=item.Name %>(string where):base("<%=item.Name %>"){base.Where=where; }
             }
                 <%
                 } %>
