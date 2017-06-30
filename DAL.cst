@@ -4,15 +4,14 @@
 <%@ Assembly Name="SchemaExplorer" %>
 <%@ Import Namespace="SchemaExplorer" %>
 <%@ Property Name="SourceDatabase" Type="SchemaExplorer.DatabaseSchema" IncludeFunctions="false" %>
-<%--<%@ Property Name="ImportBaseTableFile" Type="Boolean" Default="true" Optional="True" %>
-<%@ Property Name="ImportSqlServiceFile" Type="Boolean" Default="true" Optional="True" %>--%>
+<%@ Property Name="ImportBaseTableFile" Type="Boolean" Default="true" Optional="True" %>
+<%@ Property Name="ImportSqlServiceFile" Type="Boolean" Default="true" Optional="True" %>
 <%--<%@ Property Name="ConnectionStringName" Type="String" Default="ConnectionString" Optional="True" %>--%>
 <%@ Import Namespace="System.Text" %>
 <%@ Import Namespace="System.Linq" %>
 <%@ Import Namespace="System.Text.RegularExpressions" %>
 <%@ Import Namespace="System.Collections" %>
 <%@ Import Namespace="System.IO" %>
-
 <%@ Map Name="SqlCSharp" Src="Sql-CSharp" Description="System to C# Type Map" %>
 <%@ Map Name="DbDataReader" Src="DbType-DataReaderMethod" Description="DbType to DataReader Method Map" %>
 <%@ Map Name="SqlNativeSqlDb" Src="SqlNativeType-SqlDbType" Description="SqlNativeType to SqlDbType Map" %>
@@ -43,7 +42,7 @@ using System.Collections.Generic;
  *  </appSettings>
  * <%=DateTime.Now %>
  */
-namespace Mayb.DAL
+namespace Mayb.DAL.<%=SourceDatabase.Database.Name %>
 {
 <%
     Regex reg = new Regex(@"[\u4e00-\u9fa5]");
@@ -68,7 +67,7 @@ namespace Mayb.DAL
            			{
                        var column = item.Columns[i];
            			 %>
-                     ColumnType.Add("<%=column.Name %>",SqlDbType.<%=SqlNativeSqlDb[column.NativeType.ToString()] %>);
+                     ColumnType.Add("<%=column.Name.ToLower() %>",SqlDbType.<%=SqlNativeSqlDb[column.NativeType.ToString()] %>);
                      <%
            			}%>
                 }
@@ -280,7 +279,11 @@ namespace Mayb.DAL
             
         }
         #endregion
-       <%--<% if(ImportBaseTableFile){
+       
+    }
+namespace Mayb.DAL
+{
+<% if(ImportBaseTableFile){
            %>
            <%=ReadFile("BaseTable.cs") %>
            <%
@@ -289,9 +292,8 @@ namespace Mayb.DAL
            %>
            <%=ReadFile("SqlService.cs") %>
            <%
-       } %>--%>
-    }
-
+       } %>
+}
 <script runat="template">
 public string ReadFile(string path){
     System.IO.FileStream fs = new System.IO.FileStream(path,FileMode.Open);
