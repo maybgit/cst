@@ -7,7 +7,7 @@ using System.Text;
 
 namespace Mayb.DAL
 {
-    public class BaseTable<T> where T : new()
+    public abstract class BaseTable<T> where T : new()
     {
         public BaseTable(string tableName) { this.tableName = tableName; }
         Dictionary<string, SqlDbType> columnType;
@@ -81,7 +81,6 @@ namespace Mayb.DAL
 
         List<T> GetModels() {
             List<T> list=new List<T>();
-            this.SetParameters();
             //if (EnableTransaction) Sql.BeginTransaction();
             using (SqlDataReader reader = Sql.ExecuteSqlReader(FormatSelect))
             {
@@ -116,9 +115,6 @@ namespace Mayb.DAL
         SqlService sql;
         public SqlService Sql { get { return sql ?? (sql = new SqlService()); } set { sql = value; } }
 
-        /// <summary>
-        /// 参数名与表列名相匹配，区分大小写
-        /// </summary>
         public Dictionary<string, object> Parameters
         {
             get
@@ -139,16 +135,10 @@ namespace Mayb.DAL
 
         public bool EnableTransaction { get; set; }
 
-        /// <summary>
-        /// 参数化设置参数
-        /// </summary>
-        void SetParameters()
+        public void AddParameter(string name, object value)
         {
-            if (Parameters.Count > 0)
-            {
-                Sql.Reset();
-                foreach (var item in Parameters) Sql.AddParameter("@" + item.Key.TrimStart('@'), ColumnType[item.Key.TrimStart('@')], item.Value);
-            }
+            name = name.TrimStart('@').ToLower();
+            Sql.AddParameter("@" + name, ColumnType[name], value);
         }
         public int Update()
         {
@@ -158,8 +148,8 @@ namespace Mayb.DAL
                 string[] cols = Columns.Split(',');
                 for (int i = 0; i < cols.Length; i++) cols[i] = cols[i] + "=@" + cols[i];
                 string sql = string.Format("update {0} set {1} {2}",tableName, string.Join(",", cols),Where);
+                //throw new Exception(sql);
                 if (string.IsNullOrEmpty(Where)) throw new Exception("更新语句 Where 条件不能为空 " + sql);
-                SetParameters();
                 return Sql.ExecuteSql(sql);
             }
             catch (Exception ex)
@@ -173,7 +163,6 @@ namespace Mayb.DAL
             {
                 if (string.IsNullOrEmpty(Where)) throw new Exception("delete 语句 Where 条件不能为空,如需全部删除，可设置为1=1。");
                 string sql = string.Format("delete from {0} {1}", tableName, Where);
-                SetParameters();
                 return Sql.ExecuteSql(sql);
             }
             catch (Exception ex) { throw ex; }
@@ -183,11 +172,11 @@ namespace Mayb.DAL
             try
             {
                 string sql = string.Format("insert {0}({1}) values(@{2})", tableName, Columns, Columns.Replace(",", ",@"));
-                SetParameters();
                 return Sql.ExecuteSql(sql);
             }
             catch (Exception ex) { throw ex; }
         }
+       public void ClearParameter() { Sql.Reset(); }
     }
 
 }
