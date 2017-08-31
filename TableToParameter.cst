@@ -1,10 +1,28 @@
-﻿<%-- 
-Name:
-Author: 
-Description: 
---%>
-<%@ Template Language="C#" TargetLanguage="Text" %>
+﻿<%@ Template Language="C#" TargetLanguage="C#" Inherits="CodeSmith.BaseTemplates.OutputFileCodeTemplate" %>
+<%@ Assembly Name="CodeSmith.BaseTemplates" %>
+<%@ Import Namespace="CodeSmith.BaseTemplates" %>
+<%@ Import Namespace="System.IO" %>
+<%@ Import Namespace="System.Text" %>
+<%@ Property Name="SourceTable" Type="SchemaExplorer.TableSchema" IncludeFunctions="false" %>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer" %>
+<%@ Map Name="SqlNativeSqlDb" Src="SqlNativeType-SqlDbType" Description="SqlNativeType to SqlDbType Map" %>
+<%
+StringBuilder set = new StringBuilder();
+string columns="",paras="";
+%>
+SqlParameter[] sps = new SqlParameter[] { 
+<%foreach (var item in SourceTable.Columns){
+    if(item.IsUnique || !string.IsNullOrEmpty(item.ExtendedProperties["CS_Default"].Value.ToString()))continue;
+    set.AppendFormat("[{0}]=@{0},",item.Name);
+    columns+="["+item.Name+"],";
+    paras+="@"+item.Name+",";    
+%>
+    new SqlParameter("@<%=item.Name%>",SqlDbType.<%=SqlNativeSqlDb[item.NativeType.ToString()] %>){Value=model.<%=item.Name%>}<%=SourceTable.Columns.IndexOf(item)==SourceTable.Columns.Count-1?"":"," %>
+<%}%>
+ };
+ 
+string sql = " UPDATE <%=SourceTable.FullName %> SET <%=set.ToString().TrimEnd(',') %> WHERE ";
 
-<script runat="template">
+string sql = " INSERT <%=SourceTable.FullName %>(<%=columns.TrimEnd(',')%>) VALUES(<%=paras.TrimEnd(',')%>) ";
 
-</script>
