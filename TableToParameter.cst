@@ -3,7 +3,7 @@
 <%@ Import Namespace="CodeSmith.BaseTemplates" %>
 <%@ Import Namespace="System.IO" %>
 <%@ Import Namespace="System.Text" %>
-<%@ Property Name="SourceTable" Type="SchemaExplorer.TableSchema" IncludeFunctions="false" %>
+<%@ Property Name="SourceTable" Type="SchemaExplorer.TableSchema" %>
 <%@ Assembly Name="SchemaExplorer" %>
 <%@ Import Namespace="SchemaExplorer" %>
 <%@ Map Name="SqlNativeSqlDb" Src="SqlNativeType-SqlDbType" Description="SqlNativeType to SqlDbType Map" %>
@@ -13,7 +13,7 @@ string columns="",paras="";
 %>
 SqlParameter[] sps = new SqlParameter[] { 
 <%foreach (var item in SourceTable.Columns){
-    if(item.IsUnique || !string.IsNullOrEmpty(item.ExtendedProperties["CS_Default"].Value.ToString()))continue;
+    //if(item.IsUnique || !string.IsNullOrEmpty(item.ExtendedProperties["CS_Default"].Value.ToString()))continue;
     set.AppendFormat("[{0}]=@{0},",item.Name);
     columns+="["+item.Name+"],";
     paras+="@"+item.Name+",";    
