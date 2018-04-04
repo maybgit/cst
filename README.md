@@ -1,2 +1,2 @@
 ﻿# CodeSmith .cst Templates
-An error has been encountered. The given keyword is not in the dictionary. edit MapEditor DbType-CSharp.csmap,add Name=Xml,Value=string
+遇到错误，给定的关键字不在字典中。编辑MapEditor DbType-CSharp.csmap，增加Name=Xml,Value=string
