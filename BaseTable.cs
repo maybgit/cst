@@ -10,7 +10,7 @@ namespace Mayb.DAL
     public abstract class BaseTable<T> where T : new()
     {
         public BaseTable(string tableName) { this.tableName = tableName; }
-        Dictionary<string, SqlDbType> columnType;
+        Dictionary<string, SqlDbType> columnType; 
         public Dictionary<string, SqlDbType> ColumnType
         {
             get
