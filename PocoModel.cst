@@ -1,0 +1,20 @@
+﻿<%@ Template Language="C#" TargetLanguage="C#" Inherits="CodeSmith.BaseTemplates.OutputFileCodeTemplate" %>
+<%@ Assembly Name="CodeSmith.BaseTemplates" %>
+<%@ Import Namespace="CodeSmith.BaseTemplates" %>
+<%@ Import Namespace="System.IO" %>
+<%@ Property Name="SourceTable" Type="SchemaExplorer.TableSchema" IncludeFunctions="false" %>
+<%@ Property Name="Namespace" Type="String" Default="Models" %>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer" %>
+using System;
+using PetaPoco;
+namespace <%=Namespace %>{
+    [TableName("<%=SourceTable.Name %>")]
+    [PrimaryKey("<%=SourceTable.HasPrimaryKey %>", AutoIncrement = false)]
+    public class <%=SourceTable.Name %>{
+    <%foreach (var item in SourceTable.Columns)
+    {%>
+        [Column]public <%=item.SystemType.Name +" "+item.Name+"" %>{ get; set; }
+    <%}%>
+    }
+}

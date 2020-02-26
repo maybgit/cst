@@ -1,0 +1,38 @@
+﻿<%@ Template Language="C#" TargetLanguage="Text" %>
+<%@ Property Name="SourceDatabase" Type="SchemaExplorer.DatabaseSchema" IncludeFunctions="false" %>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer" %>
+
+<%foreach(var item in SourceDatabase.Tables)
+{
+    var index = 0;
+    var arr = item.Name.Split('_');
+    var tbName = "";
+    foreach(string str in arr){
+        tbName += str.Substring(0,1).ToUpper()+str.Substring(1);
+    }
+%>
+message <%=tbName %>{
+    <%foreach(var column in item.Columns) {%>
+    <%=string.IsNullOrEmpty(column.Description)?"":"//"+column.Description %>
+    <%=CovertType(column.DataType.ToString()) %> <%=column.Name %> = <%=index %>;
+    <%
+    index+=1;
+    } %>
+}
+<% }%>
+
+
+<script runat="template">
+public string CovertType(string type){
+    type = type.ToLower();
+    switch(type){
+        case "uint16":
+            return "bool";
+        case "datetime":
+            return "string";
+        default:
+            return type;
+    }
+}
+</script>
